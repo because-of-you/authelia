@@ -4,6 +4,9 @@
 
 package authorization
 
+// AMRWeChat identifies a WeChat mini program confirmation as its own method.
+const AMRWeChat = "wechat"
+
 // Level is the type representing an authorization level.
 type Level int
 

@@ -22,6 +22,8 @@ func NewAuthenticationMethodsReferencesFromClaim(claim []string) (amr Authentica
 			amr.TOTP = true
 		case AMRShortMessageService:
 			amr.Duo = true
+		case AMRWeChat:
+			amr.WeChat = true
 		case AMRProofOfPossession:
 			amr.WebAuthn = true
 		case AMRHardwareSecuredKey:
@@ -63,6 +65,7 @@ type AuthenticationMethodsReferences struct {
 	UsernameAndPassword          bool
 	TOTP                         bool
 	Duo                          bool
+	WeChat                       bool
 	WebAuthn                     bool
 	WebAuthnHardware             bool
 	WebAuthnSoftware             bool
@@ -78,7 +81,7 @@ func (r AuthenticationMethodsReferences) FactorKnowledge() bool {
 
 // FactorPossession returns true if a "something you have" factor of authentication was used.
 func (r AuthenticationMethodsReferences) FactorPossession() bool {
-	return r.TOTP || r.Duo || r.WebAuthn || r.WebAuthnHardware || r.WebAuthnSoftware
+	return r.TOTP || r.Duo || r.WeChat || r.WebAuthn || r.WebAuthnHardware || r.WebAuthnSoftware
 }
 
 // MultiFactorAuthentication returns true if multiple factors were used.
@@ -93,7 +96,7 @@ func (r AuthenticationMethodsReferences) ChannelBrowser() bool {
 
 // ChannelService returns true if a non-browser service was used to authenticate.
 func (r AuthenticationMethodsReferences) ChannelService() bool {
-	return r.Duo
+	return r.Duo || r.WeChat
 }
 
 // MultiChannelAuthentication returns true if the user used more than one channel to authenticate.
@@ -122,6 +125,10 @@ func (r AuthenticationMethodsReferences) MarshalRFC8176() []string {
 
 	if r.Duo {
 		amr = append(amr, AMRShortMessageService)
+	}
+
+	if r.WeChat {
+		amr = append(amr, AMRWeChat)
 	}
 
 	if r.WebAuthn || r.WebAuthnHardware || r.WebAuthnSoftware {

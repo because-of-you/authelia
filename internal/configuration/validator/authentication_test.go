@@ -47,7 +47,7 @@ func TestShouldRaiseErrorWhenNoBackendProvided(t *testing.T) {
 	ValidateAuthenticationBackend(&backendConfig, validator)
 
 	require.Len(t, validator.Errors(), 1)
-	assert.EqualError(t, validator.Errors()[0], "authentication_backend: you must ensure either the 'file' or 'ldap' authentication backend is configured")
+	assert.EqualError(t, validator.Errors()[0], "authentication_backend: you must ensure one of the 'file', 'ldap', or 'wechat_storage' authentication backends is configured")
 }
 
 type FileBasedAuthenticationBackend struct {

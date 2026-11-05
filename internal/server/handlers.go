@@ -126,6 +126,16 @@ type RegisterRoutesBridgedFunc = func(r *router.Router, config *schema.Configura
 
 //nolint:gocyclo
 func handlerMain(config *schema.Configuration, providers middlewares.Providers) (handler fasthttp.RequestHandler, err error) {
+	var wechatHandlers *handlers.WeChatHandlers
+	if config.AuthenticationBackend.WeChatStorage != nil && config.WeChat == nil {
+		return nil, errors.New("wechat_storage authentication requires wechat configuration")
+	}
+	if config.WeChat != nil {
+		wechatHandlers = handlers.NewWeChatHandlers(config.WeChat.AppID, config.WeChat.AppSecret, config.WeChat.QREnvVersion, providers.UserProvider, providers.StorageProvider)
+		if wechatHandlers == nil {
+			return nil, errors.New("wechat requires a valid app_id, app_secret, qr_env_version, and wechat_storage authentication backend")
+		}
+	}
 	optsTemplatedFile := NewTemplatedFileOptions(config)
 
 	serveIndexHandler := ServeTemplatedFile(providers.Templates.GetAssetIndexTemplate(), optsTemplatedFile)
@@ -265,6 +275,22 @@ func handlerMain(config *schema.Configuration, providers middlewares.Providers) 
 	}
 
 	r.POST("/api/checks/safe-redirection", middlewareAPI(handlers.CheckSafeRedirectionPOST))
+
+	if wechatHandlers != nil {
+		wechatLimit := middlewares.NewRateLimiter(middlewares.WithRateLimitConfig(config.Server.Endpoints.RateLimits.OpenIDConnectToken), middlewares.WithRateLimitCollector(providers.GarbageCollector)).Middleware()
+		r.POST("/api/wechat/login", middlewareAPI(wechatLimit(wechatHandlers.Login)))
+		r.GET("/api/wechat/user", middlewareAPI(wechatHandlers.User))
+		r.GET("/api/wechat/profile", middlewareAPI(wechatHandlers.Profile))
+		r.POST("/api/wechat/profile", middlewareAPI(wechatHandlers.UpdateProfile))
+		r.POST("/api/wechat/logout", middlewareAPI(wechatHandlers.Logout))
+		r.POST("/api/qr-login/start", middlewareAPI(wechatLimit(wechatHandlers.Start)))
+		r.GET("/api/qr-login/image", middlewareAPI(wechatHandlers.Image))
+		r.GET("/api/qr-login/status", middlewareAPI(wechatHandlers.Status))
+		r.POST("/api/qr-login/consume", middlewareAPI(wechatLimit(wechatHandlers.Consume)))
+		r.GET("/api/qr-login/challenge", middlewareAPI(wechatHandlers.Challenge))
+		r.POST("/api/qr-login/complete", middlewareAPI(wechatLimit(wechatHandlers.Complete)))
+		r.POST("/api/qr-login/reject", middlewareAPI(wechatLimit(wechatHandlers.Reject)))
+	}
 
 	delayerPassword := middlewares.NewTimingAttackDelay(10, time.Second).SetRecord(true)
 

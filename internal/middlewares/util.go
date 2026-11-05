@@ -64,7 +64,7 @@ func NewProviders(config *schema.Configuration, caCertPool *x509.CertPool) (prov
 	providers.SessionProvider = session.NewProvider(config.Session, caCertPool)
 	providers.TOTP = totp.NewTimeBasedProvider(config.TOTP)
 	providers.UserAttributeResolver = expression.NewUserAttributes(config)
-	providers.UserProvider = NewAuthenticationProvider(config, caCertPool)
+	providers.UserProvider = NewAuthenticationProvider(config, caCertPool, providers.StorageProvider)
 
 	switch {
 	case config.Notifier.SMTP != nil:
@@ -94,12 +94,21 @@ func NewProvidersBasic() Providers {
 }
 
 // NewAuthenticationProvider returns a new authentication.UserProvider.
-func NewAuthenticationProvider(config *schema.Configuration, caCertPool *x509.CertPool) (provider authentication.UserProvider) {
+func NewAuthenticationProvider(config *schema.Configuration, caCertPool *x509.CertPool, stores ...storage.Provider) (provider authentication.UserProvider) {
 	switch {
 	case config.AuthenticationBackend.File != nil:
 		return authentication.NewFileUserProvider(config.AuthenticationBackend.File)
 	case config.AuthenticationBackend.LDAP != nil:
 		return authentication.NewLDAPUserProvider(config.AuthenticationBackend, caCertPool)
+	case config.AuthenticationBackend.WeChatStorage != nil && config.AuthenticationBackend.WeChatStorage.Enabled:
+		if len(stores) == 0 {
+			return nil
+		}
+		directory, ok := stores[0].(authentication.WeChatDirectory)
+		if !ok {
+			return nil
+		}
+		return authentication.NewWeChatStorageUserProvider(directory)
 	default:
 		return nil
 	}

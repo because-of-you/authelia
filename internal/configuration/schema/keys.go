@@ -120,6 +120,7 @@ var Keys = []string{
 	"authentication_backend.password_reset.disable",
 	"authentication_backend.refresh_interval",
 	"authentication_backend.registration.custom_url",
+	"authentication_backend.wechat_storage.enabled",
 	"certificates_directory",
 	"default_2fa_method",
 	"default_redirection_url",
@@ -549,4 +550,8 @@ var Keys = []string{
 	"webauthn.selection_criteria.discoverability",
 	"webauthn.selection_criteria.user_verification",
 	"webauthn.timeout",
+	"wechat.app_id",
+	"wechat.app_secret",
+	"wechat.auto_register",
+	"wechat.qr_env_version",
 }

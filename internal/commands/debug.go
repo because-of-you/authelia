@@ -31,9 +31,28 @@ import (
 	"github.com/authelia/authelia/v4/internal/middlewares"
 	"github.com/authelia/authelia/v4/internal/notification"
 	"github.com/authelia/authelia/v4/internal/oidc"
+	"github.com/authelia/authelia/v4/internal/storage"
 	"github.com/authelia/authelia/v4/internal/templates"
 	"github.com/authelia/authelia/v4/internal/utils"
 )
+
+func newDebugUserProvider(config *schema.Configuration, caCertPool *x509.CertPool) (authentication.UserProvider, storage.Provider, error) {
+	if config.AuthenticationBackend.WeChatStorage == nil {
+		return middlewares.NewAuthenticationProvider(config, caCertPool), nil, nil
+	}
+	store, err := storage.NewProvider(config, caCertPool)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error initializing storage: %w", err)
+	}
+	if store == nil {
+		return nil, nil, errors.New("storage provider is not configured")
+	}
+	if err = store.StartupCheck(); err != nil {
+		_ = store.Close()
+		return nil, nil, fmt.Errorf("error initializing storage: %w", err)
+	}
+	return middlewares.NewAuthenticationProvider(config, caCertPool, store), store, nil
+}
 
 func newDebugCmd(ctx *CmdCtx) (cmd *cobra.Command) {
 	cmd = &cobra.Command{
@@ -231,7 +250,13 @@ func (ctx *CmdCtx) DebugOIDCClaimsRunE(cmd *cobra.Command, args []string) (err e
 
 //nolint:gocyclo
 func runDebugOIDCClaims(ctx context.Context, w io.Writer, flags *pflag.FlagSet, config *schema.Configuration, caCertPool *x509.CertPool, username string) (err error) {
-	provider := middlewares.NewAuthenticationProvider(config, caCertPool)
+	provider, store, err := newDebugUserProvider(config, caCertPool)
+	if err != nil {
+		return err
+	}
+	if store != nil {
+		defer store.Close()
+	}
 
 	if provider == nil {
 		return fmt.Errorf("error occurred initializing user authentication provider: a provider is not configured")
@@ -338,7 +363,13 @@ func (ctx *CmdCtx) DebugExpressionRunE(cmd *cobra.Command, args []string) (err e
 }
 
 func runDebugExpression(w io.Writer, config *schema.Configuration, caCertPool *x509.CertPool, username, exp string) (err error) {
-	provider := middlewares.NewAuthenticationProvider(config, caCertPool)
+	provider, store, err := newDebugUserProvider(config, caCertPool)
+	if err != nil {
+		return err
+	}
+	if store != nil {
+		defer store.Close()
+	}
 
 	if provider == nil {
 		return fmt.Errorf("error occurred initializing user authentication provider: a provider is not configured")

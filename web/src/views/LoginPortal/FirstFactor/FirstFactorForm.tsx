@@ -26,9 +26,11 @@ import LoginLayout from "@layouts/LoginLayout";
 import { IsCapsLockModified } from "@services/CapsLock";
 import { postFirstFactor } from "@services/Password";
 import PasskeyForm from "@views/LoginPortal/FirstFactor/PasskeyForm";
+import WeChatForm from "@views/LoginPortal/FirstFactor/WeChatForm";
 
 export interface Props {
     disabled: boolean;
+    wechatLogin?: boolean;
     passkeyLogin: boolean;
     rememberMe: boolean;
     resetPassword: boolean;
@@ -252,135 +254,152 @@ const FirstFactorForm = function (props: Props) {
         [focusPassword, focusUsername, handleSignIn, password.length, username.length],
     );
 
+    const passkeyForm = props.passkeyLogin ? (
+        <PasskeyForm
+            disabled={disabled || loading}
+            rememberMe={props.rememberMe}
+            onAuthenticationError={(err) => createErrorNotification(err.message)}
+            onAuthenticationStart={() => {
+                setUsername("");
+                setPassword("");
+                setLoading(true);
+                props.onAuthenticationStart();
+            }}
+            onAuthenticationStop={() => {
+                setLoading(false);
+                props.onAuthenticationStop();
+            }}
+            onAuthenticationSuccess={(url) => {
+                setLoading(false);
+                props.onAuthenticationSuccess(url);
+            }}
+        />
+    ) : null;
+
     return (
         <LoginLayout id="first-factor-stage" title={translate("Sign in")}>
-            <form id={"form-login"} onSubmit={(e) => e.preventDefault()}>
+            {props.wechatLogin ? (
                 <div className="grid grid-cols-1 gap-5">
-                    <div className="w-full">
-                        <FloatingInput
-                            ref={usernameRef}
-                            id="username-textfield"
-                            label={`${translate("Username")} *`}
-                            required
-                            value={username}
-                            error={usernameError}
-                            disabled={disabled}
-                            onChange={(v) => setUsername(v.target.value)}
-                            onFocus={() => setUsernameError(false)}
-                            autoCapitalize="none"
-                            autoComplete="username"
-                            onKeyDown={handleUsernameKeyDown}
-                        />
-                    </div>
-                    <div className="relative w-full">
-                        <FloatingInput
-                            ref={passwordRef}
-                            id="password-textfield"
-                            label={`${translate("Password")} *`}
-                            required
-                            disabled={disabled}
-                            value={password}
-                            error={passwordError}
-                            className="pr-10"
-                            onChange={(v) => setPassword(v.target.value)}
-                            onFocus={() => setPasswordError(false)}
-                            type={showPassword ? "text" : "password"}
-                            autoComplete="current-password"
-                            onKeyDown={handlePasswordKeyDown}
-                            onKeyUp={handlePasswordKeyUp}
-                        />
-                        <PasswordVisibilityToggle
-                            label={translate("Toggle password visibility")}
-                            showPassword={showPassword}
-                            {...toggleProps}
-                        />
-                    </div>
-                    {passwordCapsLock ? (
-                        <div className="w-full px-4">
-                            <Alert variant="warning">
-                                <AlertTitle>{translate("Warning")}</AlertTitle>
-                                {passwordCapsLockPartial
-                                    ? translate("The password was partially entered with Caps Lock")
-                                    : translate("The password was entered with Caps Lock")}
-                            </Alert>
-                        </div>
-                    ) : null}
-                    {props.rememberMe ? (
-                        <div className="-my-2 flex w-full flex-row">
-                            <div className="flex flex-grow items-center gap-2">
-                                <Checkbox
-                                    id="remember-checkbox"
-                                    disabled={disabled}
-                                    checked={rememberMe}
-                                    onCheckedChange={handleRememberMeChange}
-                                    onKeyDown={handleRememberMeKeyDown}
-                                />
-                                <Label htmlFor="remember-checkbox" className="text-base">
-                                    {translate("Remember me")}
-                                </Label>
-                            </div>
-                        </div>
-                    ) : null}
-                    <div className="w-full">
-                        <Button
-                            id="sign-in-button"
-                            type="submit"
-                            variant="default"
-                            className="w-full"
-                            disabled={disabled || loading}
-                            onClick={handleSignIn}
-                        >
-                            {translate("Sign in")}
-                            {loading ? <Spinner size={20} className="ml-2 h-5 w-5" /> : null}
-                        </Button>
-                    </div>
-                    {props.passkeyLogin ? (
-                        <PasskeyForm
-                            disabled={disabled || loading}
-                            rememberMe={props.rememberMe}
-                            onAuthenticationError={(err) => createErrorNotification(err.message)}
-                            onAuthenticationStart={() => {
-                                setUsername("");
-                                setPassword("");
-                                setLoading(true);
-                                props.onAuthenticationStart();
-                            }}
-                            onAuthenticationStop={() => {
-                                setLoading(false);
-                                props.onAuthenticationStop();
-                            }}
-                            onAuthenticationSuccess={(url) => {
-                                setLoading(false);
-                                props.onAuthenticationSuccess(url);
-                            }}
-                        />
-                    ) : null}
-                    {props.resetPassword || props.registrationURL ? (
-                        <div className="-my-2 flex w-full flex-row justify-end">
-                            {props.registrationURL ? (
-                                <button
-                                    id="register-button"
-                                    type="button"
-                                    className="mr-auto cursor-pointer py-[13.5px] text-base text-primary underline-offset-4 hover:underline"
-                                    onClick={handleRegisterClick}
-                                >
-                                    {translate("Register")}
-                                </button>
-                            ) : null}
-                            {props.resetPassword ? (
-                                <button
-                                    id="reset-password-button"
-                                    type="button"
-                                    className="cursor-pointer py-[13.5px] text-base text-primary underline-offset-4 hover:underline"
-                                    onClick={handleResetPasswordClick}
-                                >
-                                    {translate("Reset password?")}
-                                </button>
-                            ) : null}
-                        </div>
-                    ) : null}
+                    <WeChatForm
+                        disabled={disabled || loading}
+                        onAuthenticationStart={props.onAuthenticationStart}
+                        onAuthenticationStop={props.onAuthenticationStop}
+                        onAuthenticationSuccess={(url) => {
+                            void loginChannel.postMessage(true);
+                            props.onAuthenticationSuccess(url);
+                        }}
+                    />
+                    {passkeyForm}
                 </div>
-            </form>
+            ) : (
+                <form id={"form-login"} onSubmit={(e) => e.preventDefault()}>
+                    <div className="grid grid-cols-1 gap-5">
+                        <div className="w-full">
+                            <FloatingInput
+                                ref={usernameRef}
+                                id="username-textfield"
+                                label={`${translate("Username")} *`}
+                                required
+                                value={username}
+                                error={usernameError}
+                                disabled={disabled}
+                                onChange={(v) => setUsername(v.target.value)}
+                                onFocus={() => setUsernameError(false)}
+                                autoCapitalize="none"
+                                autoComplete="username"
+                                onKeyDown={handleUsernameKeyDown}
+                            />
+                        </div>
+                        <div className="relative w-full">
+                            <FloatingInput
+                                ref={passwordRef}
+                                id="password-textfield"
+                                label={`${translate("Password")} *`}
+                                required
+                                disabled={disabled}
+                                value={password}
+                                error={passwordError}
+                                className="pr-10"
+                                onChange={(v) => setPassword(v.target.value)}
+                                onFocus={() => setPasswordError(false)}
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="current-password"
+                                onKeyDown={handlePasswordKeyDown}
+                                onKeyUp={handlePasswordKeyUp}
+                            />
+                            <PasswordVisibilityToggle
+                                label={translate("Toggle password visibility")}
+                                showPassword={showPassword}
+                                {...toggleProps}
+                            />
+                        </div>
+                        {passwordCapsLock ? (
+                            <div className="w-full px-4">
+                                <Alert variant="warning">
+                                    <AlertTitle>{translate("Warning")}</AlertTitle>
+                                    {passwordCapsLockPartial
+                                        ? translate("The password was partially entered with Caps Lock")
+                                        : translate("The password was entered with Caps Lock")}
+                                </Alert>
+                            </div>
+                        ) : null}
+                        {props.rememberMe ? (
+                            <div className="-my-2 flex w-full flex-row">
+                                <div className="flex flex-grow items-center gap-2">
+                                    <Checkbox
+                                        id="remember-checkbox"
+                                        disabled={disabled}
+                                        checked={rememberMe}
+                                        onCheckedChange={handleRememberMeChange}
+                                        onKeyDown={handleRememberMeKeyDown}
+                                    />
+                                    <Label htmlFor="remember-checkbox" className="text-base">
+                                        {translate("Remember me")}
+                                    </Label>
+                                </div>
+                            </div>
+                        ) : null}
+                        <div className="w-full">
+                            <Button
+                                id="sign-in-button"
+                                type="submit"
+                                variant="default"
+                                className="w-full"
+                                disabled={disabled || loading}
+                                onClick={handleSignIn}
+                            >
+                                {translate("Sign in")}
+                                {loading ? <Spinner size={20} className="ml-2 h-5 w-5" /> : null}
+                            </Button>
+                        </div>
+                        {passkeyForm}
+                        {props.resetPassword || props.registrationURL ? (
+                            <div className="-my-2 flex w-full flex-row justify-end">
+                                {props.registrationURL ? (
+                                    <button
+                                        id="register-button"
+                                        type="button"
+                                        className="mr-auto cursor-pointer py-[13.5px] text-base text-primary underline-offset-4 hover:underline"
+                                        onClick={handleRegisterClick}
+                                    >
+                                        {translate("Register")}
+                                    </button>
+                                ) : null}
+                                {props.resetPassword ? (
+                                    <button
+                                        id="reset-password-button"
+                                        type="button"
+                                        className="cursor-pointer py-[13.5px] text-base text-primary underline-offset-4 hover:underline"
+                                        onClick={handleResetPasswordClick}
+                                    >
+                                        {translate("Reset password?")}
+                                    </button>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
+                </form>
+            )}
         </LoginLayout>
     );
 };

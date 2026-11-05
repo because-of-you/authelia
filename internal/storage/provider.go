@@ -13,12 +13,19 @@ import (
 
 	"authelia.com/provider/oauth2/storage"
 
+	"github.com/authelia/authelia/v4/internal/authentication"
 	"github.com/authelia/authelia/v4/internal/model"
+	"github.com/authelia/authelia/v4/internal/wechat"
 )
 
 // Provider is an interface providing storage capabilities for persisting any kind of data related to Authelia.
 type Provider interface {
 	model.StartupCheck
+
+	// WeChatStore uses this provider's connection and transaction handling.
+	WeChatStore() wechat.Storage
+	// LookupWeChatUser retrieves only pre-registered, enabled identities.
+	LookupWeChatUser(ctx context.Context, appID, openID, username string) (*authentication.UserDetails, error)
 
 	storage.Transactional
 

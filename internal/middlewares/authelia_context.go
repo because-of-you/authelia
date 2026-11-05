@@ -407,7 +407,29 @@ func (ctx *AutheliaCtx) GetSession() (userSession session.UserSession, err error
 		}
 	}
 
+	// A WeChat login remains valid only while the exact identity is enabled and
+	// bound to the same account. This also covers portal and OIDC endpoints.
+	if userSession.AuthenticationMethodRefs.WeChat {
+		if !validWeChatSession(ctx.Providers.UserProvider, ctx.Configuration.WeChat, userSession) {
+			if err = provider.DestroySession(ctx.RequestCtx); err != nil {
+				ctx.Logger.WithError(err).Error("Unable to destroy revoked WeChat session")
+			}
+			return provider.NewDefaultUserSession(), nil
+		}
+	}
+
 	return userSession, nil
+}
+
+func validWeChatSession(provider authentication.UserProvider, config *schema.WeChat, userSession session.UserSession) bool {
+	resolver, ok := provider.(interface {
+		ResolveWeChatUser(appID, openID string) (*authentication.UserDetails, error)
+	})
+	if !ok || config == nil || userSession.WeChatAppID == "" || userSession.WeChatOpenID == "" || config.AppID != userSession.WeChatAppID {
+		return false
+	}
+	details, err := resolver.ResolveWeChatUser(userSession.WeChatAppID, userSession.WeChatOpenID)
+	return err == nil && details != nil && details.Username != "" && details.Username == userSession.Username
 }
 
 // SaveSession saves the content of the session.

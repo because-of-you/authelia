@@ -20,6 +20,28 @@ import (
 //go:embed migrations/*
 var migrationsFS embed.FS
 
+// validateMigrationVersions rejects conflicting migrations before executing any SQL.
+// Filenames distinguish the up and down direction, but version numbers are global.
+func validateMigrationVersions(entries []fs.DirEntry) error {
+	versions := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		match := reMigration.FindStringSubmatch(entry.Name())
+		if match == nil {
+			return fmt.Errorf("invalid migration filename %q", entry.Name())
+		}
+		version := match[reMigration.SubexpIndex("Version")]
+		name := match[reMigration.SubexpIndex("Name")]
+		if previous, ok := versions[version]; ok && previous != name {
+			return fmt.Errorf("migration version %s is used by both %q and %q; reconcile migrations before starting", version, previous, name)
+		}
+		versions[version] = name
+	}
+	return nil
+}
+
 func latestMigrationVersion(providerName string) (version int, err error) {
 	var (
 		entries   []fs.DirEntry
@@ -27,6 +49,9 @@ func latestMigrationVersion(providerName string) (version int, err error) {
 	)
 
 	if entries, err = migrationsFS.ReadDir(path.Join(pathMigrations, providerName)); err != nil {
+		return -1, err
+	}
+	if err = validateMigrationVersions(entries); err != nil {
 		return -1, err
 	}
 
@@ -65,6 +90,9 @@ func loadMigrations(providerName string, prior, target int) (migrations []model.
 	)
 
 	if entries, err = migrationsFS.ReadDir(path.Join(pathMigrations, providerName)); err != nil {
+		return nil, err
+	}
+	if err = validateMigrationVersions(entries); err != nil {
 		return nil, err
 	}
 

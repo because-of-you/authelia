@@ -90,8 +90,8 @@ const (
 
 // Authentication Backend Error constants.
 const (
-	errFmtAuthBackendNotConfigured = "authentication_backend: you must ensure either the 'file' or 'ldap' " +
-		"authentication backend is configured"
+	errFmtAuthBackendNotConfigured = "authentication_backend: you must ensure one of the 'file', 'ldap', or 'wechat_storage' " +
+		"authentication backends is configured"
 	errFmtAuthBackendMultipleConfigured = "authentication_backend: please ensure only one of the 'file' or 'ldap' " +
 		"backend is configured"
 	errFmtAuthBackendRefreshInterval = "authentication_backend: option 'refresh_interval' is configured to '%s' but " +

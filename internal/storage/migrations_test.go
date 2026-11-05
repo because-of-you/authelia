@@ -7,8 +7,10 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -19,9 +21,26 @@ import (
 	"github.com/authelia/authelia/v4/internal/utils"
 )
 
+func TestWeChatMigrationVersionConflict(t *testing.T) {
+	files := fstest.MapFS{
+		"V0031.WeChatAuthentication.up.sql":   &fstest.MapFile{},
+		"V0031.WeChatAuthentication.down.sql": &fstest.MapFile{},
+		"V0031.UpstreamChange.up.sql":         &fstest.MapFile{},
+		"V0031.UpstreamChange.down.sql":       &fstest.MapFile{},
+	}
+	entries, err := fs.ReadDir(files, ".")
+	require.NoError(t, err)
+	require.ErrorContains(t, validateMigrationVersions(entries), "migration version 0031")
+	delete(files, "V0031.UpstreamChange.up.sql")
+	delete(files, "V0031.UpstreamChange.down.sql")
+	entries, err = fs.ReadDir(files, ".")
+	require.NoError(t, err)
+	require.NoError(t, validateMigrationVersions(entries))
+}
+
 const (
 	// This is the latest schema version for the purpose of tests.
-	LatestVersion = 30
+	LatestVersion = 32
 )
 
 func TestShouldObtainCorrectMigrations(t *testing.T) {

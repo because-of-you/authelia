@@ -577,13 +577,14 @@ func handleAuthnCookieValidateInactivity(ctx AuthzContext, manager session.Manag
 }
 
 func handleSessionValidateRefresh(ctx AuthzContext, userSession *session.UserSession, refresh schema.RefreshIntervalDuration) (modified, invalid bool) {
-	if refresh.Never() || userSession.IsAnonymous() {
+	wechatSession := userSession.AuthenticationMethodRefs.WeChat
+	if userSession.IsAnonymous() || (refresh.Never() && !wechatSession) {
 		return false, false
 	}
 
 	ctx.GetLogger().WithField("username", userSession.Username).Trace("Checking if we need check the authentication backend for an updated profile for user")
 
-	if !refresh.Always() && userSession.RefreshTTL.After(ctx.GetClock().Now()) {
+	if !wechatSession && !refresh.Always() && userSession.RefreshTTL.After(ctx.GetClock().Now()) {
 		return false, false
 	}
 
@@ -593,7 +594,19 @@ func handleSessionValidateRefresh(ctx AuthzContext, userSession *session.UserSes
 		details *authentication.UserDetails
 		err     error
 	)
-	if details, err = ctx.GetUserProvider().GetDetails(userSession.Username); err != nil {
+	if wechatSession {
+		resolver, ok := ctx.GetUserProvider().(interface {
+			ResolveWeChatUser(appID, openID string) (*authentication.UserDetails, error)
+		})
+		config := ctx.GetConfiguration().WeChat
+		if !ok || config == nil || config.AppID != userSession.WeChatAppID || userSession.WeChatAppID == "" || userSession.WeChatOpenID == "" {
+			return false, true
+		}
+		details, err = resolver.ResolveWeChatUser(userSession.WeChatAppID, userSession.WeChatOpenID)
+	} else {
+		details, err = ctx.GetUserProvider().GetDetails(userSession.Username)
+	}
+	if err != nil {
 		if errors.Is(err, authentication.ErrUserNotFound) {
 			ctx.GetLogger().WithField("username", userSession.Username).Error("Error occurred while attempting to update user details for user: the user was not found indicating they were deleted, disabled, or otherwise no longer authorized to login")
 
@@ -602,7 +615,12 @@ func handleSessionValidateRefresh(ctx AuthzContext, userSession *session.UserSes
 
 		ctx.GetLogger().WithError(err).WithField("username", userSession.Username).Error("Error occurred while attempting to update user details for user")
 
-		return false, false
+		// The WeChat directory is the source of authorization for these sessions.
+		// A failed lookup must not retain stale permissions.
+		return false, wechatSession
+	}
+	if details == nil || details.Username == "" || (wechatSession && details.Username != userSession.Username) {
+		return false, wechatSession
 	}
 
 	var (
@@ -612,7 +630,7 @@ func handleSessionValidateRefresh(ctx AuthzContext, userSession *session.UserSes
 	diffEmails, diffGroups = utils.IsStringSlicesDifferent(userSession.Emails, details.Emails), utils.IsStringSlicesDifferent(userSession.Groups, details.Groups)
 	diffDisplayName = userSession.DisplayName != details.DisplayName
 
-	if !refresh.Always() {
+	if !wechatSession && !refresh.Always() {
 		modified = true
 
 		userSession.RefreshTTL = ctx.GetClock().Now().Add(refresh.Value())

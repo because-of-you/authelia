@@ -19,8 +19,10 @@ import (
 	reflect "reflect"
 	time "time"
 
+	authentication "github.com/authelia/authelia/v4/internal/authentication"
 	model "github.com/authelia/authelia/v4/internal/model"
 	storage "github.com/authelia/authelia/v4/internal/storage"
+	wechat "github.com/authelia/authelia/v4/internal/wechat"
 	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -816,6 +818,21 @@ func (mr *MockStorageMockRecorder) LoadWebAuthnUserByUserID(ctx, rpid, userID an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadWebAuthnUserByUserID", reflect.TypeOf((*MockStorage)(nil).LoadWebAuthnUserByUserID), ctx, rpid, userID)
 }
 
+// LookupWeChatUser mocks base method.
+func (m *MockStorage) LookupWeChatUser(ctx context.Context, appID, openID, username string) (*authentication.UserDetails, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupWeChatUser", ctx, appID, openID, username)
+	ret0, _ := ret[0].(*authentication.UserDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LookupWeChatUser indicates an expected call of LookupWeChatUser.
+func (mr *MockStorageMockRecorder) LookupWeChatUser(ctx, appID, openID, username any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupWeChatUser", reflect.TypeOf((*MockStorage)(nil).LookupWeChatUser), ctx, appID, openID, username)
+}
+
 // RevokeBannedIP mocks base method.
 func (m *MockStorage) RevokeBannedIP(ctx context.Context, id int, expired time.Time) error {
 	m.ctrl.T.Helper()
@@ -1453,4 +1470,18 @@ func (m *MockStorage) UpdateWebAuthnCredentialSignIn(ctx context.Context, creden
 func (mr *MockStorageMockRecorder) UpdateWebAuthnCredentialSignIn(ctx, credential any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateWebAuthnCredentialSignIn", reflect.TypeOf((*MockStorage)(nil).UpdateWebAuthnCredentialSignIn), ctx, credential)
+}
+
+// WeChatStore mocks base method.
+func (m *MockStorage) WeChatStore() wechat.Storage {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WeChatStore")
+	ret0, _ := ret[0].(wechat.Storage)
+	return ret0
+}
+
+// WeChatStore indicates an expected call of WeChatStore.
+func (mr *MockStorageMockRecorder) WeChatStore() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WeChatStore", reflect.TypeOf((*MockStorage)(nil).WeChatStore))
 }

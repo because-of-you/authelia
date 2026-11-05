@@ -15,6 +15,7 @@ export interface AutheliaState {
     username: string;
     authentication_level: AuthenticationLevel;
     factor_knowledge: boolean;
+    wechat_enabled?: boolean;
     default_redirection_url?: string;
 }
 

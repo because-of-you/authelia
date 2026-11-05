@@ -111,7 +111,7 @@ func OAuth2AuthorizationGET(ctx *middlewares.AutheliaCtx, rw http.ResponseWriter
 		return
 	}
 
-	if userSession, err = provider.GetSession(ctx.RequestCtx); err != nil {
+	if userSession, err = ctx.GetSession(); err != nil {
 		ctx.GetLogger().Errorf("Authorization Request with id '%s' on client with id '%s' using policy '%s' could not be processed: error occurred obtaining session information: %+v", requester.GetID(), client.GetID(), policy.Name, err)
 
 		ctx.Providers.OpenIDConnect.WriteAuthorizeError(ctx, rw, requester, oauthelia2.ErrServerError.WithHint("Could not obtain the user session."))

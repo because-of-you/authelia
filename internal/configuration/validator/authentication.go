@@ -24,7 +24,7 @@ import (
 
 // ValidateAuthenticationBackend validates and updates the authentication backend configuration.
 func ValidateAuthenticationBackend(config *schema.AuthenticationBackend, validator *schema.StructValidator) {
-	if config.LDAP == nil && config.File == nil {
+	if config.LDAP == nil && config.File == nil && config.WeChatStorage == nil {
 		validator.Push(errors.New(errFmtAuthBackendNotConfigured))
 	}
 
@@ -56,6 +56,16 @@ func ValidateAuthenticationBackend(config *schema.AuthenticationBackend, validat
 
 	if config.LDAP != nil && config.File != nil {
 		validator.Push(errors.New(errFmtAuthBackendMultipleConfigured))
+	}
+	if config.WeChatStorage != nil {
+		if !config.WeChatStorage.Enabled {
+			validator.Push(errors.New("authentication_backend: wechat_storage must be enabled"))
+		}
+		if config.LDAP != nil || config.File != nil {
+			validator.Push(errors.New("authentication_backend: wechat_storage cannot be combined with another backend"))
+		}
+		config.PasswordReset.Disable = true
+		config.PasswordChange.Disable = true
 	}
 
 	if config.File != nil {

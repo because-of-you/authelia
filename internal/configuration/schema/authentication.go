@@ -19,8 +19,14 @@ type AuthenticationBackend struct {
 	RefreshInterval RefreshIntervalDuration `koanf:"refresh_interval" yaml:"refresh_interval,omitempty" toml:"refresh_interval,omitempty" json:"refresh_interval,omitempty" jsonschema:"default=5 minutes,title=Refresh Interval" jsonschema_description:"How frequently the user details are refreshed from the backend."`
 
 	// The file authentication backend configuration.
-	File *AuthenticationBackendFile `koanf:"file" yaml:"file,omitempty" toml:"file,omitempty" json:"file,omitempty" jsonschema:"title=File Backend" jsonschema_description:"The file authentication backend configuration."`
-	LDAP *AuthenticationBackendLDAP `koanf:"ldap" yaml:"ldap,omitempty" toml:"ldap,omitempty" json:"ldap,omitempty" jsonschema:"title=LDAP Backend" jsonschema_description:"The LDAP authentication backend configuration."`
+	File          *AuthenticationBackendFile          `koanf:"file" yaml:"file,omitempty" toml:"file,omitempty" json:"file,omitempty" jsonschema:"title=File Backend" jsonschema_description:"The file authentication backend configuration."`
+	LDAP          *AuthenticationBackendLDAP          `koanf:"ldap" yaml:"ldap,omitempty" toml:"ldap,omitempty" json:"ldap,omitempty" jsonschema:"title=LDAP Backend" jsonschema_description:"The LDAP authentication backend configuration."`
+	WeChatStorage *AuthenticationBackendWeChatStorage `koanf:"wechat_storage" yaml:"wechat_storage,omitempty" toml:"wechat_storage,omitempty" json:"wechat_storage,omitempty"`
+}
+
+// AuthenticationBackendWeChatStorage selects the directory in the configured Authelia storage.
+type AuthenticationBackendWeChatStorage struct {
+	Enabled bool `koanf:"enabled" yaml:"enabled" toml:"enabled" json:"enabled"`
 }
 
 // AuthenticationBackendPasswordChange represents the configuration related to password reset functionality.

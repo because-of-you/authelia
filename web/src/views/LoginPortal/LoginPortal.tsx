@@ -198,6 +198,7 @@ const LoginPortal = function (props: Props) {
                     <ComponentOrLoading ready={firstFactorReady}>
                         <FirstFactorForm
                             disabled={firstFactorDisabled}
+                            wechatLogin={state?.wechat_enabled === true}
                             passkeyLogin={props.passkeyLogin}
                             rememberMe={props.rememberMe}
                             resetPassword={props.resetPassword}

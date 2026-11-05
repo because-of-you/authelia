@@ -49,6 +49,12 @@ func (s *UserSession) SetOneFactorPassword(now time.Time, details *authenticatio
 	s.AuthenticationMethodRefs.UsernameAndPassword = true
 }
 
+// SetOneFactorWeChat records a verified WeChat identity as one factor.
+func (s *UserSession) SetOneFactorWeChat(now time.Time, details *authentication.UserDetails) {
+	s.setOneFactor(now, details, false)
+	s.AuthenticationMethodRefs.WeChat = true
+}
+
 // SetOneFactorPasskey sets the 1FA AMR's and expected property values for one factor passkey authentication.
 func (s *UserSession) SetOneFactorPasskey(now time.Time, details *authentication.UserDetails, keepMeLoggedIn, hardware, userPresence, userVerified bool) {
 	s.setOneFactor(now, details, keepMeLoggedIn)

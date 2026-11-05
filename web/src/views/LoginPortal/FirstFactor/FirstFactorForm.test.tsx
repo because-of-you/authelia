@@ -90,6 +90,14 @@ vi.mock("@views/LoginPortal/FirstFactor/PasskeyForm", () => ({
     ),
 }));
 
+vi.mock("@views/LoginPortal/FirstFactor/WeChatForm", () => ({
+    default: (props: any) => (
+        <div data-testid="wechat-form">
+            <button data-testid="wechat-success" onClick={() => props.onAuthenticationSuccess("https://example.com")} />
+        </div>
+    ),
+}));
+
 const postFirstFactorMock = vi.mocked(postFirstFactor);
 
 const defaultProps = {
@@ -103,7 +111,24 @@ const defaultProps = {
     rememberMe: false,
     resetPassword: false,
     resetPasswordCustomURL: "",
+    wechatLogin: false,
 };
+
+describe("WeChat integration", () => {
+    it("shows WeChat instead of password authentication and keeps passkeys available", () => {
+        renderForm({ passkeyLogin: true, wechatLogin: true });
+        expect(screen.getByTestId("wechat-form")).toBeInTheDocument();
+        expect(screen.getByTestId("passkey-form")).toBeInTheDocument();
+        expect(document.getElementById("username-textfield")).not.toBeInTheDocument();
+    });
+
+    it("forwards WeChat success through the normal login flow", () => {
+        const { props } = renderForm({ wechatLogin: true });
+        fireEvent.click(screen.getByTestId("wechat-success"));
+        expect(props.onAuthenticationSuccess).toHaveBeenCalledWith("https://example.com");
+        expect(mocks.postMessage).toHaveBeenCalledWith(true);
+    });
+});
 
 function renderForm(props: Partial<typeof defaultProps> = {}) {
     const merged = {

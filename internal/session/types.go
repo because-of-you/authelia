@@ -38,6 +38,12 @@ type UserSession struct {
 
 	AuthenticationMethodRefs authorization.AuthenticationMethodsReferences
 
+	// WeChatBrowserBinding is an unguessable nonce held only in the browser session.
+	WeChatBrowserBinding string
+	// WeChatAppID and WeChatOpenID allow each authorization to detect revoked bindings.
+	WeChatAppID  string
+	WeChatOpenID string
+
 	// WebAuthn holds the session registration data for this session.
 	WebAuthn *WebAuthn
 	TOTP     *TOTP

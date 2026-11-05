@@ -117,5 +117,13 @@
 	"You're being signed out and redirected": "You're being signed out and redirected",
 	"Your browser does not support the WebAuthn protocol": "Your browser does not support the WebAuthn protocol",
 	"Your supplied password does not meet the password policy requirements": "Your supplied password does not meet the password policy requirements",
-	"or": "or"
+	"or": "or",
+	"Preparing WeChat sign in": "Preparing WeChat sign in",
+	"Sign in with WeChat": "Sign in with WeChat",
+	"Scan with WeChat and confirm sign in": "Scan with WeChat and confirm sign in",
+	"Unable to complete WeChat sign in": "Unable to complete WeChat sign in",
+	"Waiting for confirmation": "Waiting for confirmation",
+	"WeChat sign-in QR code": "WeChat sign-in QR code",
+	"WeChat sign-in request expired": "WeChat sign-in request expired",
+	"WeChat sign-in request was declined": "WeChat sign-in request was declined"
 }

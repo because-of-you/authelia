@@ -27,6 +27,7 @@ func StateGET(ctx *middlewares.AutheliaCtx) {
 		Username:            userSession.Username,
 		AuthenticationLevel: userSession.AuthenticationLevel(ctx.Configuration.WebAuthn.EnablePasskey2FA),
 		FactorKnowledge:     userSession.AuthenticationMethodRefs.FactorKnowledge(),
+		WeChatEnabled:       WeChatEnabled(ctx),
 	}
 
 	if uri := ctx.GetDefaultRedirectionURL(); uri != nil {
