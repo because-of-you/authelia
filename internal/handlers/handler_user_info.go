@@ -15,7 +15,49 @@ import (
 	"github.com/authelia/authelia/v4/internal/model"
 	"github.com/authelia/authelia/v4/internal/session"
 	"github.com/authelia/authelia/v4/internal/utils"
+	"github.com/authelia/authelia/v4/internal/wechat"
 )
+
+func wechatSessionProfile(ctx *middlewares.AutheliaCtx, userSession session.UserSession) (wechat.Profile, error) {
+	if !userSession.AuthenticationMethodRefs.WeChat || userSession.Username == "" || userSession.WeChatAppID == "" || userSession.WeChatOpenID == "" {
+		return wechat.Profile{}, wechat.ErrNotFound
+	}
+	store := wechatStore(ctx.Providers.StorageProvider)
+	if store == nil {
+		return wechat.Profile{}, wechat.ErrNotFound
+	}
+	return store.Profile(ctx, wechat.MiniSession{Username: userSession.Username, AppID: userSession.WeChatAppID, OpenID: userSession.WeChatOpenID})
+}
+
+func applyWeChatProfile(ctx *middlewares.AutheliaCtx, userSession session.UserSession, userInfo *model.UserInfo) {
+	profile, err := wechatSessionProfile(ctx, userSession)
+	if err != nil {
+		if !errors.Is(err, wechat.ErrNotFound) {
+			ctx.Logger.WithError(err).Warn("Unable to load WeChat profile")
+		}
+		return
+	}
+	if profile.Nickname != "" {
+		userInfo.DisplayName = profile.Nickname
+	}
+	userInfo.WeChatAvatar = wechat.ImageContentType(profile.Avatar) != ""
+}
+
+// WeChatAvatarGET serves only the avatar belonging to the authenticated browser session.
+func WeChatAvatarGET(ctx *middlewares.AutheliaCtx) {
+	userSession, err := ctx.GetSession()
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		return
+	}
+	profile, err := wechatSessionProfile(ctx, userSession)
+	if err != nil || wechat.ImageContentType(profile.Avatar) == "" {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		return
+	}
+	ctx.SetContentType(wechat.ImageContentType(profile.Avatar))
+	ctx.SetBody(profile.Avatar)
+}
 
 // UserInfoPOST handles setting up info for users if necessary when they login.
 func UserInfoPOST(ctx *middlewares.AutheliaCtx) {
@@ -78,6 +120,7 @@ func UserInfoPOST(ctx *middlewares.AutheliaCtx) {
 	}
 
 	userInfo.DisplayName = userSession.DisplayName
+	applyWeChatProfile(ctx, userSession, &userInfo)
 
 	err = ctx.SetJSONBody(userInfo)
 	if err != nil {
@@ -109,6 +152,7 @@ func UserInfoGET(ctx *middlewares.AutheliaCtx) {
 	}
 
 	userInfo.DisplayName = userSession.DisplayName
+	applyWeChatProfile(ctx, userSession, &userInfo)
 
 	// it should be noted that UserInfo only contains info from the database and NOT any info from the authn_backend (email/groups).
 	for _, email := range userSession.Emails {

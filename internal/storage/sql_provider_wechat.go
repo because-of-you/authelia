@@ -34,7 +34,7 @@ func (s *wechatSQLStore) conn(ctx context.Context) wechatSQLConnection {
 func (p *SQLProvider) WeChatStore() wechat.Storage { return &wechatSQLStore{provider: p} }
 
 func (s *wechatSQLStore) Profile(ctx context.Context, session wechat.MiniSession) (profile wechat.Profile, err error) {
-	err = s.conn(ctx).QueryRowContext(ctx, `SELECT p.nickname, p.avatar FROM wechat_profiles p JOIN wechat_users u ON u.id = p.user_id JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND u.enabled = ? AND i.appid = ? AND i.openid = ?`, session.Username, true, session.AppID, session.OpenID).Scan(&profile.Nickname, &profile.Avatar)
+	err = s.conn(ctx).QueryRowContext(ctx, `SELECT p.nickname, p.avatar FROM wechat_profiles p JOIN wechat_users u ON u.id = p.user_id JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND i.appid = ? AND i.openid = ?`, session.Username, session.AppID, session.OpenID).Scan(&profile.Nickname, &profile.Avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return wechat.Profile{}, wechat.ErrNotFound
 	}
@@ -49,7 +49,7 @@ func (s *wechatSQLStore) SaveProfile(ctx context.Context, session wechat.MiniSes
 	defer tx.Rollback()
 	conn := wechatSQLConnection{tx}
 	var userID int64
-	err = conn.QueryRowContext(ctx, `SELECT u.id FROM wechat_users u JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND u.enabled = ? AND i.appid = ? AND i.openid = ?`, session.Username, true, session.AppID, session.OpenID).Scan(&userID)
+	err = conn.QueryRowContext(ctx, `SELECT u.id FROM wechat_users u JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND i.appid = ? AND i.openid = ?`, session.Username, session.AppID, session.OpenID).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return wechat.ErrNotFound
 	}
@@ -94,13 +94,54 @@ func (s *wechatSQLStore) RegisterIdentity(ctx context.Context, appID, openID str
 		return err
 	}
 	username := "wechat_" + hex.EncodeToString(random[:])
-	if _, err = conn.ExecContext(ctx, `INSERT INTO wechat_users (username, display_name, enabled) VALUES (?, ?, ?)`, username, "微信用户", true); err != nil {
+	if _, err = conn.ExecContext(ctx, `INSERT INTO wechat_users (username, display_name, enabled) VALUES (?, ?, ?)`, username, "微信用户", false); err != nil {
 		return err
 	}
 	if _, err = conn.ExecContext(ctx, `INSERT INTO wechat_identities (user_id, appid, openid) SELECT id, ?, ? FROM wechat_users WHERE username = ?`, appID, openID, username); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// LookupMiniUser resolves a verified WeChat identity regardless of its web access status.
+func (s *wechatSQLStore) LookupMiniUser(ctx context.Context, appID, openID string) (*authentication.UserDetails, bool, error) {
+	if appID == "" || openID == "" {
+		return nil, false, authentication.ErrUserNotFound
+	}
+	conn := s.conn(ctx)
+	query := `SELECT u.username, u.display_name, u.enabled, i.appid, i.openid, g.name FROM wechat_users u JOIN wechat_identities i ON i.user_id = u.id LEFT JOIN wechat_user_groups ug ON ug.user_id = u.id LEFT JOIN wechat_groups g ON g.id = ug.group_id WHERE i.appid = ? AND i.openid = ? ORDER BY g.name`
+	rows, err := conn.QueryContext(ctx, conn.Rebind(query), appID, openID)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	var details *authentication.UserDetails
+	var enabled bool
+	for rows.Next() {
+		var username, displayName, storedAppID, storedOpenID string
+		var rowEnabled bool
+		var group sql.NullString
+		if err = rows.Scan(&username, &displayName, &rowEnabled, &storedAppID, &storedOpenID, &group); err != nil {
+			return nil, false, err
+		}
+		if username == "" || storedAppID != appID || storedOpenID != openID || (details != nil && details.Username != username) {
+			return nil, false, authentication.ErrUserNotFound
+		}
+		if details == nil {
+			details = &authentication.UserDetails{Username: username, DisplayName: displayName, Groups: []string{}}
+			enabled = rowEnabled
+		}
+		if group.Valid && group.String != "" {
+			details.Groups = append(details.Groups, group.String)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, false, err
+	}
+	if details == nil {
+		return nil, false, authentication.ErrUserNotFound
+	}
+	return details, enabled, nil
 }
 
 // LookupWeChatUser resolves only an explicitly enabled account in the configured store.
@@ -213,12 +254,24 @@ func (s *wechatSQLStore) Challenge(ctx context.Context, transaction, binding str
 	return c, nil
 }
 
-// Decide atomically approves or rejects a still-pending unexpired challenge.
+// MarkScanned marks an unexpired challenge without authenticating or approving it.
+func (s *wechatSQLStore) MarkScanned(ctx context.Context, transaction string, now time.Time) error {
+	result, err := s.conn(ctx).ExecContext(ctx, `UPDATE wechat_qr_challenges SET status = 'scanned' WHERE transaction_hash = ? AND status IN ('pending', 'scanned') AND expires_at > ?`, digest(transaction), now.Unix())
+	return oneRow(result, err)
+}
+
+// Decide atomically approves or rejects a still-active unexpired challenge.
 func (s *wechatSQLStore) Decide(ctx context.Context, transaction string, session wechat.MiniSession, status string, now time.Time) error {
 	if status != "approved" && status != "rejected" {
 		return wechat.ErrNotFound
 	}
-	result, err := s.conn(ctx).ExecContext(ctx, `UPDATE wechat_qr_challenges SET status = ?, approved_username = ?, approved_appid = ?, approved_openid = ? WHERE transaction_hash = ? AND status = 'pending' AND expires_at > ?`, status, session.Username, session.AppID, session.OpenID, digest(transaction), now.Unix())
+	query := `UPDATE wechat_qr_challenges SET status = ?, approved_username = ?, approved_appid = ?, approved_openid = ? WHERE transaction_hash = ? AND status IN ('pending', 'scanned') AND expires_at > ?`
+	args := []any{status, session.Username, session.AppID, session.OpenID, digest(transaction), now.Unix()}
+	if status == "approved" {
+		query += ` AND EXISTS (SELECT 1 FROM wechat_users u JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND u.enabled = ? AND i.appid = ? AND i.openid = ?)`
+		args = append(args, session.Username, true, session.AppID, session.OpenID)
+	}
+	result, err := s.conn(ctx).ExecContext(ctx, query, args...)
 	return oneRow(result, err)
 }
 

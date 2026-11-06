@@ -21,7 +21,7 @@ export interface WeChatChallenge {
 }
 
 export interface WeChatChallengeStatus {
-    status: "approved" | "consumed" | "expired" | "pending" | "rejected";
+    status: "approved" | "consumed" | "expired" | "pending" | "rejected" | "scanned";
     redirect?: string;
 }
 
@@ -42,10 +42,16 @@ export function consumeWeChatChallenge(transaction: string, signal: AbortSignal)
 }
 
 // Only a same-origin QR endpoint is permitted by the portal's content security policy.
-export function isSafeWeChatQRCode(url: string): boolean {
+export function isSafeWeChatQRCode(url: string, transaction: string): boolean {
     try {
         const parsed = new URL(url, window.location.origin);
-        return parsed.origin === window.location.origin && parsed.pathname === `${path()}/image`;
+        const transactions = parsed.searchParams.getAll("transaction");
+        return (
+            parsed.origin === window.location.origin &&
+            parsed.pathname === `${path()}/image` &&
+            transactions.length === 1 &&
+            transactions[0] === transaction
+        );
     } catch {
         return false;
     }

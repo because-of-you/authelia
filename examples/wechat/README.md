@@ -10,15 +10,14 @@ authentication_backend:
 wechat:
   app_id: 'wx-your-app-id'
   # Set AUTHELIA_WECHAT_APP_SECRET_FILE to a protected file containing the secret.
-  qr_env_version: 'develop'
-  auto_register: true # Optional: allow verified WeChat identities to create an account.
+  qr_env_version: 'release' # Use develop or trial for matching pre-release miniapp versions.
 ```
 
 Set the QR environment to `develop`, `trial`, or `release` to match the available miniapp version. Do not place AppSecret in the miniapp or source control. Configure `storage` as usual; no second MySQL connection is needed.
 
 The authenticated miniapp profile stores the user's chosen nickname and avatar in the configured storage. These are user-supplied display data, not verified identity attributes. Avatars must be PNG or JPEG and at most 256 KiB; profile endpoints require the current miniapp session. Use HTTPS outside local development. Existing device-only profiles are not uploaded automatically; users can save them again.
 
-By default an administrator must provision an enabled account and its verified `(appid, openid)` mapping before it can sign in. With `auto_register: true`, any successfully verified WeChat identity can create an enabled account without groups. This can grant access wherever the access policy allows any authenticated user; only enable it if open enrollment is intended. Disabled identities are not re-enabled. Nicknames and avatars are never used as account identifiers. For local SQLite, after the Authelia storage migrations have run, an example of manual provisioning is:
+A successfully verified WeChat identity is automatically registered without groups and is disabled by default. Disabled users can sign in to the miniapp and manage their own profile, but cannot approve a website login until an administrator enables the account. Existing disabled identities are not re-enabled automatically. The legacy `auto_register` setting is retained for compatibility and does not control registration. Nicknames and avatars are never used as account identifiers. For local SQLite, after the Authelia storage migrations have run, an example of manual provisioning is:
 
 ```sql
 INSERT INTO wechat_users (username, display_name, enabled) VALUES ('user-001', 'Example User', 1);
@@ -30,7 +29,7 @@ SELECT u.id, g.id FROM wechat_users u CROSS JOIN wechat_groups g
 WHERE u.username = 'user-001' AND g.name = 'internal_users';
 ```
 
-The example requires a securely obtained and verified OpenID; this project does not yet provide an administrator enrollment workflow. Protect database access and do not put real identity values in source control. Disabling an account prevents subsequent WeChat session validation. Removing a binding invalidates existing sessions, but when automatic registration is enabled the same identity can register a new account. Previously issued OIDC tokens follow their configured lifetime and revocation policy.
+The example requires a securely obtained and verified OpenID. Protect database access and do not put real identity values in source control. Disabling an account prevents website login approval, while access to the user's own miniapp profile remains available. Removing a binding invalidates existing sessions; the same identity can subsequently register a new disabled account. Previously issued OIDC tokens follow their configured lifetime and revocation policy.
 
 The previous experimental `wechat_mysql` configuration and manually provisioned tables are not migrated automatically. Back up any existing data and plan an explicit migration before enabling this version against an existing deployment.
 

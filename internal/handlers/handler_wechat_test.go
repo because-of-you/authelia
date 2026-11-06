@@ -175,7 +175,7 @@ func TestWeChatBrowserSessionRejectsChangedAppID(t *testing.T) {
 }
 
 func TestWeChatUserGroupsAreAlwaysAnArray(t *testing.T) {
-	data, err := json.Marshal(wechatUserData(&authentication.UserDetails{Username: "alice"}))
+	data, err := json.Marshal(wechatUserData(&authentication.UserDetails{Username: "alice"}, true))
 	if err != nil {
 		t.Fatal(err)
 	}

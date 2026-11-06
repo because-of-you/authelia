@@ -165,18 +165,20 @@ type wechatUser struct {
 	Username    string   `json:"username"`
 	DisplayName string   `json:"display_name"`
 	Groups      []string `json:"groups"`
+	Enabled     bool     `json:"enabled"`
 }
 
-func wechatUserData(details *authentication.UserDetails) wechatUser {
+func wechatUserData(details *authentication.UserDetails, enabled bool) wechatUser {
 	groups := details.Groups
 	if groups == nil {
 		groups = []string{}
 	}
-	return wechatUser{Username: details.Username, DisplayName: details.DisplayName, Groups: groups}
+	return wechatUser{Username: details.Username, DisplayName: details.DisplayName, Groups: groups, Enabled: enabled}
 }
 
 type wechatAuthenticatedSession struct {
 	Details *authentication.UserDetails
+	Enabled bool
 	Session wechat.MiniSession
 	Token   string
 }
@@ -200,12 +202,12 @@ func (h *WeChatHandlers) authenticated(ctx *middlewares.AutheliaCtx) (*wechatAut
 		wechatError(ctx, fasthttp.StatusUnauthorized, "账户不可用")
 		return nil, false
 	}
-	details, err := h.provider.ResolveWeChatUser(stored.AppID, stored.OpenID)
+	details, enabled, err := h.store.LookupMiniUser(ctx, stored.AppID, stored.OpenID)
 	if err != nil || details == nil || details.Username == "" || details.Username != stored.Username {
 		wechatError(ctx, fasthttp.StatusUnauthorized, "账户不可用")
 		return nil, false
 	}
-	return &wechatAuthenticatedSession{Details: details, Session: stored, Token: token}, true
+	return &wechatAuthenticatedSession{Details: details, Enabled: enabled, Session: stored, Token: token}, true
 }
 
 func wechatCheckBan(ctx *middlewares.AutheliaCtx, username string) bool {
@@ -239,11 +241,11 @@ func (h *WeChatHandlers) Login(ctx *middlewares.AutheliaCtx) {
 		wechatError(ctx, fasthttp.StatusUnauthorized, "微信登录失败，请重试")
 		return
 	}
-	details, err := h.provider.ResolveWeChatUser(h.client.AppID, openID)
-	if errors.Is(err, authentication.ErrUserNotFound) && ctx.Configuration.WeChat.AutoRegister {
+	details, enabled, err := h.store.LookupMiniUser(ctx, h.client.AppID, openID)
+	if errors.Is(err, authentication.ErrUserNotFound) {
 		registerErr := h.store.RegisterIdentity(ctx, h.client.AppID, openID)
-		// A concurrent registration may have completed first; always recheck the enabled account.
-		details, err = h.provider.ResolveWeChatUser(h.client.AppID, openID)
+		// A concurrent registration may have completed first; always look up the identity again.
+		details, enabled, err = h.store.LookupMiniUser(ctx, h.client.AppID, openID)
 		if registerErr != nil && err != nil && !errors.Is(registerErr, wechat.ErrNotFound) {
 			ctx.Logger.Error("Failed to register WeChat account in storage")
 			wechatError(ctx, fasthttp.StatusServiceUnavailable, "认证服务暂不可用")
@@ -271,7 +273,7 @@ func (h *WeChatHandlers) Login(ctx *middlewares.AutheliaCtx) {
 		return
 	}
 	doMarkAuthenticationAttempt(ctx, true, regulation.NewBan(regulation.BanTypeNone, details.Username, nil), regulation.AuthType1FA, nil)
-	if err = ctx.SetJSONBody(map[string]any{"access_token": token, "expires_at": expires, "user": wechatUserData(details)}); err != nil {
+	if err = ctx.SetJSONBody(map[string]any{"access_token": token, "expires_at": expires, "user": wechatUserData(details, enabled)}); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to write WeChat login response")
 	}
 }
@@ -282,7 +284,7 @@ func (h *WeChatHandlers) User(ctx *middlewares.AutheliaCtx) {
 	if !ok {
 		return
 	}
-	if err := ctx.SetJSONBody(map[string]any{"expires_at": auth.Session.ExpiresAt, "user": wechatUserData(auth.Details)}); err != nil {
+	if err := ctx.SetJSONBody(map[string]any{"expires_at": auth.Session.ExpiresAt, "user": wechatUserData(auth.Details, auth.Enabled)}); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to write WeChat user response")
 	}
 }
@@ -425,6 +427,26 @@ func (h *WeChatHandlers) Image(ctx *middlewares.AutheliaCtx) {
 	ctx.SetBody(image)
 }
 
+// Scan records that a QR code was opened; possession alone never authorizes login.
+func (h *WeChatHandlers) Scan(ctx *middlewares.AutheliaCtx) {
+	var body struct {
+		Transaction string `json:"transaction"`
+	}
+	if !wechatBody(ctx, &body) || !wechatValidHex(body.Transaction, 16) {
+		wechatError(ctx, fasthttp.StatusBadRequest, "授权请求无效")
+		return
+	}
+	if err := h.store.MarkScanned(ctx, body.Transaction, time.Now()); err != nil {
+		if errors.Is(err, wechat.ErrNotFound) {
+			wechatError(ctx, fasthttp.StatusConflict, "授权请求已失效")
+		} else {
+			wechatError(ctx, fasthttp.StatusServiceUnavailable, "认证服务暂不可用")
+		}
+		return
+	}
+	ctx.ReplyOK()
+}
+
 // Challenge returns server-derived target and expiry information for the confirmation screen.
 func (h *WeChatHandlers) Challenge(ctx *middlewares.AutheliaCtx) {
 	if _, ok := h.authenticated(ctx); !ok {
@@ -444,7 +466,7 @@ func (h *WeChatHandlers) Challenge(ctx *middlewares.AutheliaCtx) {
 		}
 		return
 	}
-	if (c.Status == "pending" || c.Status == "approved") && !c.ExpiresAt.After(time.Now()) {
+	if (c.Status == "pending" || c.Status == "scanned" || c.Status == "approved") && !c.ExpiresAt.After(time.Now()) {
 		c.Status = "expired"
 	}
 	if err = ctx.SetJSONBody(map[string]any{"target_domain": c.TargetDomain, "expires_at": c.ExpiresAt, "status": c.Status}); err != nil {
@@ -455,6 +477,10 @@ func (h *WeChatHandlers) Challenge(ctx *middlewares.AutheliaCtx) {
 func (h *WeChatHandlers) decide(ctx *middlewares.AutheliaCtx, decision string) {
 	auth, ok := h.authenticated(ctx)
 	if !ok {
+		return
+	}
+	if decision == "approved" && !auth.Enabled {
+		wechatError(ctx, fasthttp.StatusForbidden, "账户尚未启用，无法授权登录")
 		return
 	}
 	var body struct {
@@ -506,7 +532,7 @@ func (h *WeChatHandlers) Status(ctx *middlewares.AutheliaCtx) {
 		}
 		return
 	}
-	if (c.Status == "pending" || c.Status == "approved") && !c.ExpiresAt.After(time.Now()) {
+	if (c.Status == "pending" || c.Status == "scanned" || c.Status == "approved") && !c.ExpiresAt.After(time.Now()) {
 		c.Status = "expired"
 	}
 	if err = ctx.SetJSONBody(map[string]any{"status": c.Status}); err != nil {

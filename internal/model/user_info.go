@@ -13,6 +13,9 @@ type UserInfo struct {
 	// The users display name.
 	DisplayName string `db:"-" json:"display_name"`
 
+	// True when the current WeChat session has a saved avatar.
+	WeChatAvatar bool `db:"-" json:"wechat_avatar,omitempty"`
+
 	// The users email address.
 	Emails []string `db:"-" json:"emails"`
 

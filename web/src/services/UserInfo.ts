@@ -11,6 +11,7 @@ export type Method2FA = "mobile_push" | "totp" | "webauthn";
 
 export interface UserInfoPayload {
     display_name: string;
+    wechat_avatar?: boolean;
     emails: string[];
     method: Method2FA;
     has_webauthn: boolean;

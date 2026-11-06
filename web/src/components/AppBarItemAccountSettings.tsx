@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { useState } from "react";
+
 import { LogOut, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +21,7 @@ import { useFlowPresent } from "@hooks/Flow";
 import { useRouterNavigate } from "@hooks/RouterNavigate";
 import { useSignOut } from "@hooks/SignOut";
 import { UserInfo } from "@models/UserInfo";
+import { getBasePath } from "@utils/BasePath";
 
 export interface Props {
     userInfo?: UserInfo;
@@ -26,6 +29,7 @@ export interface Props {
 
 const AppBarItemAccountSettings = function (props: Props) {
     const { t: translate } = useTranslation();
+    const [avatarFailed, setAvatarFailed] = useState(false);
 
     const navigate = useRouterNavigate();
     const doSignOut = useSignOut();
@@ -57,9 +61,18 @@ const AppBarItemAccountSettings = function (props: Props) {
                                             className="ml-4 rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
                                         >
                                             <Avatar className="size-8">
-                                                <AvatarFallback>
-                                                    {props.userInfo.display_name.charAt(0).toUpperCase()}
-                                                </AvatarFallback>
+                                                {props.userInfo.wechat_avatar && !avatarFailed ? (
+                                                    <img
+                                                        src={`${getBasePath()}/api/user/wechat-avatar`}
+                                                        alt=""
+                                                        className="h-full w-full object-cover"
+                                                        onError={() => setAvatarFailed(true)}
+                                                    />
+                                                ) : (
+                                                    <AvatarFallback>
+                                                        {props.userInfo.display_name.charAt(0).toUpperCase()}
+                                                    </AvatarFallback>
+                                                )}
                                             </Avatar>
                                         </button>
                                     }

@@ -22,6 +22,8 @@ vi.mock("@hooks/Flow", () => ({
     useFlowPresent: vi.fn(),
 }));
 
+vi.mock("@utils/BasePath", () => ({ getBasePath: () => "/auth" }));
+
 const mockUserInfo = {
     display_name: "john",
     emails: ["john@example.com"],
@@ -49,6 +51,16 @@ it("does not render when no userinfo", () => {
 it("renders avatar with first letter of display name", () => {
     vi.mocked(useFlowPresent).mockReturnValue(false);
     render(<AppBarItemAccountSettings userInfo={mockUserInfo} />);
+    expect(screen.getByText("J")).toBeInTheDocument();
+});
+
+it("uses the saved WeChat avatar and falls back to the initial on image failure", () => {
+    vi.mocked(useFlowPresent).mockReturnValue(false);
+    render(<AppBarItemAccountSettings userInfo={{ ...mockUserInfo, wechat_avatar: true }} />);
+    const avatar = screen.getByRole("presentation", { hidden: true });
+    expect(avatar).toHaveAttribute("src", "/auth/api/user/wechat-avatar");
+    expect(screen.queryByText("J")).not.toBeInTheDocument();
+    fireEvent.error(avatar);
     expect(screen.getByText("J")).toBeInTheDocument();
 });
 

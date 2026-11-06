@@ -51,6 +51,8 @@ vi.mock("@utils/Configuration", () => ({
     getLogoOverride: vi.fn(() => false),
 }));
 
+vi.mock("@utils/BasePath", () => ({ getBasePath: () => "/auth" }));
+
 beforeEach(() => {
     mockSetLocale.mockReset();
 });
@@ -68,6 +70,18 @@ it("renders with default SVG logo", async () => {
     expect(screen.getByTestId("app-bar")).toBeInTheDocument();
     expect(screen.getByTestId("brand")).toBeInTheDocument();
     expect(screen.getByTestId("privacy-policy")).toBeInTheDocument();
+});
+
+it("shows the authenticated WeChat avatar and falls back if the image fails", async () => {
+    await act(async () => {
+        render(<LoginLayout userInfo={{ wechat_avatar: true } as any} />);
+    });
+
+    const avatar = screen.getByRole("presentation", { hidden: true });
+    expect(avatar).toHaveAttribute("src", "/auth/api/user/wechat-avatar");
+    expect(screen.queryByTestId("user-svg")).not.toBeInTheDocument();
+    fireEvent.error(avatar);
+    expect(screen.getByTestId("user-svg")).toBeInTheDocument();
 });
 
 it("renders with image logo when override is enabled", async () => {

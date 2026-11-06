@@ -124,6 +124,11 @@
 	"Unable to complete WeChat sign in": "Unable to complete WeChat sign in",
 	"Waiting for confirmation": "Waiting for confirmation",
 	"WeChat sign-in QR code": "WeChat sign-in QR code",
-	"WeChat sign-in request expired": "WeChat sign-in request expired",
+	"QR code scanned": "QR code scanned",
+	"Scan again": "Scan again",
+	"Authorization failed": "Authorization failed",
+	"Confirm sign in on your phone": "Confirm sign in on your phone",
+	"WeChat sign in successful": "WeChat sign in successful",
+	"WeChat sign-in request expired": "WeChat sign-in request expired. Please refresh the QR code.",
 	"WeChat sign-in request was declined": "WeChat sign-in request was declined"
 }

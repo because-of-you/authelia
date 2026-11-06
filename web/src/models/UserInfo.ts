@@ -6,6 +6,7 @@ import { SecondFactorMethod } from "@models/Methods";
 
 export interface UserInfo {
     display_name: string;
+    wechat_avatar?: boolean;
     emails: string[];
     method: SecondFactorMethod;
     has_webauthn: boolean;

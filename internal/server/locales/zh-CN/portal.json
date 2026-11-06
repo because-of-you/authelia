@@ -104,6 +104,11 @@
 	"Unable to complete WeChat sign in": "微信登录暂时不可用，请稍后重试",
 	"Waiting for confirmation": "等待微信确认",
 	"WeChat sign-in QR code": "微信登录二维码",
-	"WeChat sign-in request expired": "登录二维码已过期",
+	"QR code scanned": "扫码成功",
+	"Scan again": "重新扫码",
+	"Authorization failed": "授权失败",
+	"Confirm sign in on your phone": "请在手机上确认登录",
+	"WeChat sign in successful": "登录成功",
+	"WeChat sign-in request expired": "登录二维码已过期，请刷新二维码",
 	"WeChat sign-in request was declined": "已取消微信登录"
 }

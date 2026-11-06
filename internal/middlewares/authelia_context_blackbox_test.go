@@ -1332,7 +1332,7 @@ func TestAutheliaCtx_SetJSONBody(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(middlewares.ContentTypeApplicationJSON), mock.Ctx.Response.Header.ContentType())
-	assert.Equal(t, []byte(`{"status":"OK","data":{"username":"","authentication_level":0,"factor_knowledge":false}}`), mock.Ctx.Response.Body())
+	assert.Equal(t, []byte(`{"status":"OK","data":{"username":"","authentication_level":0,"factor_knowledge":false,"wechat_enabled":false}}`), mock.Ctx.Response.Body())
 }
 
 func TestAutheliaCtx_Session(t *testing.T) {
