@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Authelia
+#
+# SPDX-License-Identifier: Apache-2.0
+
+.git
+.idea
+.DS_Store
+**/.DS_Store
+**/node_modules
+**/.vitest
+**/.env*
+!web/.env.production
+local-dev
+/configuration.yml
+internal/server/public_html
+coverage.txt

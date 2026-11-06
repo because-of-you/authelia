@@ -33,6 +33,12 @@ The example requires a securely obtained and verified OpenID. Protect database a
 
 The previous experimental `wechat_mysql` configuration and manually provisioned tables are not migrated automatically. Back up any existing data and plan an explicit migration before enabling this version against an existing deployment.
 
+## Building the fork's container image
+
+The `Build and publish image` GitHub Actions workflow builds `Dockerfile.image` and publishes to the repository's GitHub Container Registry package whenever a branch is pushed, or when started manually. It publishes `linux/amd64` and `linux/arm64` images under a branch tag and a `sha-<full-commit-sha>` tag. For this repository, the package is `ghcr.io/because-of-you/authelia`; the `codex/wechat-qr-auth` branch tag is `codex-wechat-qr-auth`.
+
+The workflow uses the repository's `GITHUB_TOKEN` with `packages: write`; Actions must be enabled and allowed to publish packages. Check package visibility and configure image pull credentials where needed. Use a SHA tag or digest in deployment configuration so that the deployed image can be traced to an exact commit. Image publication does not update or deploy the Helm release.
+
 ## Merging upstream storage migrations
 
 Authelia tracks a single global numeric schema version, not a separate version per filename or feature. This branch currently uses versions 31 and 32 for WeChat. If upstream adds either version, keep both migration files during the merge: the migration loader detects the duplicate version and fails before applying migrations. Do not resolve the collision by discarding an upstream file or merely renaming the WeChat files.
