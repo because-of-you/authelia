@@ -58,6 +58,7 @@ type GroupUser struct {
 type Profile struct {
 	Nickname string
 	Avatar   []byte
+	Email    *string
 }
 
 // AuthenticationRecord is a limited view of an account's native authentication attempts.

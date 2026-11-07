@@ -1,3 +1,4 @@
+DROP TABLE wechat_profiles;
 DROP TABLE wechat_user_groups;
 DROP TABLE wechat_identities;
 DROP TABLE wechat_groups;

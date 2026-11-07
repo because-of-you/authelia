@@ -17,6 +17,8 @@ Set the QR environment to `develop`, `trial`, or `release` to match the availabl
 
 The authenticated miniapp profile stores the user's chosen nickname and avatar in the configured storage. These are user-supplied display data, not verified identity attributes. Avatars must be PNG or JPEG and at most 256 KiB; profile endpoints require the current miniapp session. Use HTTPS outside local development. Existing device-only profiles are not uploaded automatically; users can save them again.
 
+Users may also enter an optional email address. Addresses are unique in the WeChat directory, ignoring case, but are not verified: the corresponding OIDC `email_verified` claim is false. Applications must not use an unverified email to link an existing account or make access decisions. WeChat does not provide the user's default email to the miniapp.
+
 A successfully verified WeChat identity is automatically registered without groups and is disabled by default. Disabled users can sign in to the miniapp and manage their own profile, but cannot approve a website login until an administrator enables the account. Existing disabled identities are not re-enabled automatically. The legacy `auto_register` setting is retained for compatibility and does not control registration. Nicknames and avatars are never used as account identifiers. For local SQLite, after the Authelia storage migrations have run, an example of manual provisioning is:
 
 ```sql
@@ -41,8 +43,8 @@ The workflow uses the repository's `GITHUB_TOKEN` with `packages: write`; Action
 
 ## Merging upstream storage migrations
 
-Authelia tracks a single global numeric schema version, not a separate version per filename or feature. This branch currently uses versions 31 and 32 for WeChat. If upstream adds either version, keep both migration files during the merge: the migration loader detects the duplicate version and fails before applying migrations. Do not resolve the collision by discarding an upstream file or merely renaming the WeChat files.
+Authelia tracks a single global numeric schema version, not a separate version per filename or feature. This branch uses version 31 for WeChat. If upstream adds the same version, the migration loader detects the conflict and fails before applying migrations. Do not resolve the collision by discarding an upstream file or merely renaming the WeChat files.
 
-Databases which already ran a WeChat migration have recorded those version numbers in Authelia's migration history. Changing a filename alone does not change that history and can cause an upstream migration to be skipped. Before merging or deploying such a change, back up affected databases, inventory which versions and WeChat tables each has, then design and test a one-time, provider-specific upgrade that preserves both upstream and WeChat data. Verify fresh databases and databases on each previously deployed version, including rollback where supported. Do not edit migration history manually without such a tested conversion.
+Version 31 was consolidated for new databases. Earlier development databases which already applied the old versions 31 or 32 are not compatible with the consolidated migration and must be backed up and rebuilt, or migrated separately with a tested conversion. Do not manually edit migration history. Before deploying to an existing database, back it up and verify its schema version and migration path.
 
-Longer term, a separately versioned WeChat extension migration system would avoid occupying upstream version numbers, but it must include a tested conversion for databases already on versions 31 or 32. This branch does not yet implement that conversion.
+Longer term, a separately versioned WeChat extension migration system would avoid occupying upstream version numbers. This branch does not yet implement that conversion.

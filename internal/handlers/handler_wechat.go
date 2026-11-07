@@ -14,6 +14,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -40,7 +41,7 @@ func (h *WeChatHandlers) Profile(ctx *middlewares.AutheliaCtx) {
 	}
 	profile, err := h.store.Profile(ctx, auth.Session)
 	if errors.Is(err, wechat.ErrNotFound) {
-		if err = ctx.SetJSONBody(map[string]any{"nickname": "", "avatar": ""}); err != nil {
+		if err = ctx.SetJSONBody(map[string]any{"nickname": "", "avatar": "", "email": ""}); err != nil {
 			ctx.Logger.Error("Failed to write profile response")
 		}
 		return
@@ -49,7 +50,11 @@ func (h *WeChatHandlers) Profile(ctx *middlewares.AutheliaCtx) {
 		wechatError(ctx, fasthttp.StatusServiceUnavailable, "资料暂不可用")
 		return
 	}
-	if err = ctx.SetJSONBody(map[string]any{"nickname": profile.Nickname, "avatar": profile.Avatar}); err != nil {
+	email := ""
+	if profile.Email != nil {
+		email = *profile.Email
+	}
+	if err = ctx.SetJSONBody(map[string]any{"nickname": profile.Nickname, "avatar": profile.Avatar, "email": email}); err != nil {
 		ctx.Logger.Error("Failed to write profile response")
 	}
 }
@@ -61,8 +66,9 @@ func (h *WeChatHandlers) UpdateProfile(ctx *middlewares.AutheliaCtx) {
 		return
 	}
 	var body struct {
-		Nickname string `json:"nickname"`
-		Avatar   []byte `json:"avatar"`
+		Nickname string  `json:"nickname"`
+		Avatar   []byte  `json:"avatar"`
+		Email    *string `json:"email"`
 	}
 	contentType := strings.TrimSpace(strings.SplitN(string(ctx.Request.Header.ContentType()), ";", 2)[0])
 	if !strings.EqualFold(contentType, "application/json") || len(ctx.PostBody()) == 0 || len(ctx.PostBody()) > 400000 || json.Unmarshal(ctx.PostBody(), &body) != nil {
@@ -70,6 +76,17 @@ func (h *WeChatHandlers) UpdateProfile(ctx *middlewares.AutheliaCtx) {
 		return
 	}
 	body.Nickname = strings.TrimSpace(body.Nickname)
+	if body.Email != nil {
+		value := strings.ToLower(strings.TrimSpace(*body.Email))
+		if value != "" {
+			parsed, parseErr := mail.ParseAddress(value)
+			if parseErr != nil || parsed.Address != value || parsed.Name != "" || len(value) > 320 || !strings.Contains(value, "@") || !isASCII(value) {
+				wechatError(ctx, fasthttp.StatusBadRequest, "邮箱格式无效")
+				return
+			}
+		}
+		body.Email = &value
+	}
 	imageConfig, format, err := image.DecodeConfig(bytes.NewReader(body.Avatar))
 	if body.Nickname == "" || !utf8.ValidString(body.Nickname) || utf8.RuneCountInString(body.Nickname) > 30 || len(body.Avatar) == 0 || len(body.Avatar) > 256*1024 || err != nil || (format != "png" && format != "jpeg") || imageConfig.Width <= 0 || imageConfig.Height <= 0 || imageConfig.Width > 2048 || imageConfig.Height > 2048 {
 		wechatError(ctx, fasthttp.StatusBadRequest, "请选择不超过256KB的PNG或JPEG头像并填写昵称")
@@ -79,15 +96,26 @@ func (h *WeChatHandlers) UpdateProfile(ctx *middlewares.AutheliaCtx) {
 		wechatError(ctx, fasthttp.StatusBadRequest, "头像图片无效")
 		return
 	}
-	if err = h.store.SaveProfile(ctx, auth.Session, wechat.Profile{Nickname: body.Nickname, Avatar: body.Avatar}); err != nil {
+	if err = h.store.SaveProfile(ctx, auth.Session, wechat.Profile{Nickname: body.Nickname, Avatar: body.Avatar, Email: body.Email}); err != nil {
 		if errors.Is(err, wechat.ErrNotFound) {
 			wechatError(ctx, fasthttp.StatusUnauthorized, "账户不可用")
+		} else if errors.Is(err, wechat.ErrConflict) {
+			wechatError(ctx, fasthttp.StatusConflict, "邮箱已被其他账户使用")
 		} else {
 			wechatError(ctx, fasthttp.StatusServiceUnavailable, "资料保存失败")
 		}
 		return
 	}
 	ctx.ReplyOK()
+}
+
+func isASCII(value string) bool {
+	for _, r := range value {
+		if r > 127 {
+			return false
+		}
+	}
+	return true
 }
 
 // WeChatEnabled reports whether the configured provider and WeChat client can be used.

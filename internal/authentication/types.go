@@ -25,6 +25,8 @@ type UserDetails struct {
 	DisplayName string
 	Emails      []string
 	Groups      []string
+	// EmailUnverified marks self-reported email addresses without proof of ownership.
+	EmailUnverified bool
 }
 
 // Addresses returns the Emails []string as []mail.Address formatted with DisplayName as the Name attribute.
@@ -150,6 +152,11 @@ func (d *UserDetailsExtended) GetEmails() (emails []string) {
 	}
 
 	return d.UserDetails.GetEmails()
+}
+
+// GetEmailVerified reports whether the directory treats the email as verified.
+func (d *UserDetailsExtended) GetEmailVerified() bool {
+	return d == nil || d.UserDetails == nil || !d.UserDetails.EmailUnverified
 }
 
 // GetGivenName returns the given name.

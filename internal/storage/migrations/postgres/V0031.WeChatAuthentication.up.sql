@@ -40,3 +40,11 @@ CREATE TABLE wechat_qr_challenges (
     expires_at BIGINT NOT NULL, qr_image BYTEA NOT NULL
 );
 CREATE INDEX wechat_qr_challenges_expiry ON wechat_qr_challenges(expires_at);
+
+CREATE TABLE wechat_profiles (
+    user_id BIGINT PRIMARY KEY REFERENCES wechat_users(id) ON DELETE CASCADE,
+    nickname VARCHAR(120) NOT NULL,
+    avatar BYTEA NOT NULL
+);
+
+CREATE UNIQUE INDEX wechat_users_email_unique ON wechat_users (LOWER(email));

@@ -55,6 +55,9 @@ func (a *UserDetailerActivation) ResolveName(name string) (object any, found boo
 
 		return emails[1:], true
 	case AttributeUserEmailVerified:
+		if detailer, ok := a.detailer.(interface{ GetEmailVerified() bool }); ok {
+			return detailer.GetEmailVerified(), true
+		}
 		return true, true
 	case AttributeUserGivenName:
 		return a.detailer.GetGivenName(), true

@@ -34,9 +34,13 @@ func (s *wechatSQLStore) conn(ctx context.Context) wechatSQLConnection {
 func (p *SQLProvider) WeChatStore() wechat.Storage { return &wechatSQLStore{provider: p} }
 
 func (s *wechatSQLStore) Profile(ctx context.Context, session wechat.MiniSession) (profile wechat.Profile, err error) {
-	err = s.conn(ctx).QueryRowContext(ctx, `SELECT p.nickname, p.avatar FROM wechat_profiles p JOIN wechat_users u ON u.id = p.user_id JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND i.appid = ? AND i.openid = ?`, session.Username, session.AppID, session.OpenID).Scan(&profile.Nickname, &profile.Avatar)
+	var email sql.NullString
+	err = s.conn(ctx).QueryRowContext(ctx, `SELECT p.nickname, p.avatar, u.email FROM wechat_profiles p JOIN wechat_users u ON u.id = p.user_id JOIN wechat_identities i ON i.user_id = u.id WHERE u.username = ? AND i.appid = ? AND i.openid = ?`, session.Username, session.AppID, session.OpenID).Scan(&profile.Nickname, &profile.Avatar, &email)
 	if errors.Is(err, sql.ErrNoRows) {
 		return wechat.Profile{}, wechat.ErrNotFound
+	}
+	if email.Valid {
+		profile.Email = &email.String
 	}
 	return profile, err
 }
@@ -55,6 +59,18 @@ func (s *wechatSQLStore) SaveProfile(ctx context.Context, session wechat.MiniSes
 	}
 	if err != nil {
 		return err
+	}
+	if profile.Email != nil {
+		var email any
+		if *profile.Email != "" {
+			email = *profile.Email
+		}
+		if _, err = conn.ExecContext(ctx, `UPDATE wechat_users SET email = ? WHERE id = ?`, email, userID); err != nil {
+			if IsUniqueConstraintViolation(err) {
+				return wechat.ErrConflict
+			}
+			return err
+		}
 	}
 	if _, err = conn.ExecContext(ctx, `DELETE FROM wechat_profiles WHERE user_id = ?`, userID); err != nil {
 		return err
@@ -176,7 +192,7 @@ func (p *SQLProvider) LookupWeChatUser(ctx context.Context, appID, openID, usern
 			return nil, errors.New("invalid WeChat directory result")
 		}
 		if details == nil {
-			details = &authentication.UserDetails{Username: user, DisplayName: displayName, Groups: []string{}}
+			details = &authentication.UserDetails{Username: user, DisplayName: displayName, Groups: []string{}, EmailUnverified: true}
 			if email.Valid && email.String != "" {
 				details.Emails = []string{email.String}
 			}

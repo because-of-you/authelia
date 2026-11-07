@@ -36,6 +36,14 @@ func (d *UserAttributeResolverDetailer) GetUpdatedAt() time.Time {
 	return d.updated
 }
 
+// GetEmailVerified preserves the directory's explicit email verification status.
+func (d *UserAttributeResolverDetailer) GetEmailVerified() bool {
+	if detailer, ok := d.UserDetailer.(interface{ GetEmailVerified() bool }); ok {
+		return detailer.GetEmailVerified()
+	}
+	return true
+}
+
 // ExtendedUserDetailer is a UserDetailer which also provides the time the details were updated.
 type ExtendedUserDetailer interface {
 	UserDetailer

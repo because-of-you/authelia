@@ -40,7 +40,7 @@ func TestWeChatMigrationVersionConflict(t *testing.T) {
 
 const (
 	// This is the latest schema version for the purpose of tests.
-	LatestVersion = 32
+	LatestVersion = 31
 )
 
 func TestShouldObtainCorrectMigrations(t *testing.T) {

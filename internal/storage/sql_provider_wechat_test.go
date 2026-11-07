@@ -165,3 +165,32 @@ func TestWeChatProfileUsesAuthenticatedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, profile, got)
 }
+
+func TestWeChatProfileEmailIsUniqueAndScoped(t *testing.T) {
+	p := newTestSQLiteProviderWithEncryption(t)
+	t.Cleanup(func() { require.NoError(t, p.Close()) })
+	ctx := context.Background()
+	require.NoError(t, p.SchemaMigrate(ctx, true, SchemaLatest))
+	s := p.WeChatStore()
+	require.NoError(t, s.RegisterIdentity(ctx, "wx-test", "alice-email"))
+	require.NoError(t, s.RegisterIdentity(ctx, "wx-test", "bob-email"))
+	alice, _, err := s.LookupMiniUser(ctx, "wx-test", "alice-email")
+	require.NoError(t, err)
+	bob, _, err := s.LookupMiniUser(ctx, "wx-test", "bob-email")
+	require.NoError(t, err)
+	a := wechat.MiniSession{Username: alice.Username, AppID: "wx-test", OpenID: "alice-email"}
+	b := wechat.MiniSession{Username: bob.Username, AppID: "wx-test", OpenID: "bob-email"}
+	email, duplicate := "alice@example.com", "ALICE@example.com"
+	require.NoError(t, s.SaveProfile(ctx, a, wechat.Profile{Nickname: "Alice", Avatar: []byte("a"), Email: &email}))
+	require.ErrorIs(t, s.SaveProfile(ctx, b, wechat.Profile{Nickname: "Bob", Avatar: []byte("b"), Email: &duplicate}), wechat.ErrConflict)
+	require.NoError(t, s.SaveProfile(ctx, a, wechat.Profile{Nickname: "Alice updated", Avatar: []byte("a")}))
+	got, err := s.Profile(ctx, a)
+	require.NoError(t, err)
+	require.Equal(t, email, *got.Email)
+	_, err = p.db.ExecContext(ctx, `UPDATE wechat_users SET enabled = ? WHERE username = ?`, true, a.Username)
+	require.NoError(t, err)
+	details, err := p.LookupWeChatUser(ctx, a.AppID, a.OpenID, "")
+	require.NoError(t, err)
+	require.Equal(t, []string{email}, details.Emails)
+	require.True(t, details.EmailUnverified)
+}

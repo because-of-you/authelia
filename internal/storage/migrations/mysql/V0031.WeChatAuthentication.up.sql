@@ -8,7 +8,7 @@ CREATE TABLE wechat_users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     username VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     display_name VARCHAR(255) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
-    email VARCHAR(320) CHARACTER SET utf8mb4 DEFAULT NULL,
+    email VARCHAR(320) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
     enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -69,3 +69,12 @@ CREATE TABLE wechat_qr_challenges (
   qr_image MEDIUMBLOB NOT NULL,
   INDEX wechat_qr_challenges_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE wechat_profiles (
+    user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    nickname VARCHAR(120) NOT NULL,
+    avatar MEDIUMBLOB NOT NULL,
+    CONSTRAINT wechat_profiles_user_fk FOREIGN KEY (user_id) REFERENCES wechat_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE UNIQUE INDEX wechat_users_email_unique ON wechat_users (email);

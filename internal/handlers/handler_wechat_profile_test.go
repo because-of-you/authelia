@@ -27,12 +27,16 @@ type testProfileStore struct {
 	session wechat.MiniSession
 	profile wechat.Profile
 	saves   int
+	saveErr error
 }
 
 func (s *testProfileStore) Session(context.Context, string, time.Time) (wechat.MiniSession, error) {
 	return s.session, nil
 }
 func (s *testProfileStore) SaveProfile(_ context.Context, session wechat.MiniSession, profile wechat.Profile) error {
+	if s.saveErr != nil {
+		return s.saveErr
+	}
 	s.session, s.profile = session, profile
 	s.saves++
 	return nil
@@ -89,13 +93,23 @@ func TestWeChatProfileRequiresSessionAndValidImage(t *testing.T) {
 	require.Zero(t, store.saves)
 	var avatar bytes.Buffer
 	require.NoError(t, png.Encode(&avatar, image.NewRGBA(image.Rect(0, 0, 1, 1))))
-	body, err := json.Marshal(map[string]any{"nickname": "Alice", "avatar": avatar.Bytes()})
+	invalid, err := json.Marshal(map[string]any{"nickname": "Alice", "avatar": avatar.Bytes(), "email": "not-an-email"})
+	require.NoError(t, err)
+	mock.Ctx.Request.SetBody(invalid)
+	h.UpdateProfile(mock.Ctx)
+	require.Equal(t, 400, mock.Ctx.Response.StatusCode())
+	require.Zero(t, store.saves)
+	body, err := json.Marshal(map[string]any{"nickname": "Alice", "avatar": avatar.Bytes(), "email": "Alice@Example.com"})
 	require.NoError(t, err)
 	mock.Ctx.Request.SetBody(body)
 	h.UpdateProfile(mock.Ctx)
 	require.Equal(t, 1, store.saves)
 	require.Equal(t, "Alice", store.profile.Nickname)
+	require.Equal(t, "alice@example.com", *store.profile.Email)
 	require.Equal(t, "open-id", store.session.OpenID)
+	store.saveErr = wechat.ErrConflict
+	h.UpdateProfile(mock.Ctx)
+	require.Equal(t, 409, mock.Ctx.Response.StatusCode())
 }
 
 func TestDisabledWeChatUserCannotApproveChallenge(t *testing.T) {

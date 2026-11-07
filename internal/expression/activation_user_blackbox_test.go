@@ -15,6 +15,15 @@ import (
 	. "github.com/authelia/authelia/v4/internal/expression"
 )
 
+func TestUserDetailerActivationUnverifiedEmail(t *testing.T) {
+	activation := NewUserDetailerActivation(nil, &authentication.UserDetailsExtended{
+		UserDetails: &authentication.UserDetails{Emails: []string{"alice@example.com"}, EmailUnverified: true},
+	}, time.Time{})
+	value, found := activation.ResolveName(AttributeUserEmailVerified)
+	assert.True(t, found)
+	assert.Equal(t, false, value)
+}
+
 func TestUserDetailerActivationBlackBox(t *testing.T) {
 	activation := &UserDetailerActivation{}
 
