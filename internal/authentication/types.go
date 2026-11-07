@@ -106,7 +106,14 @@ type UserDetailsExtended struct {
 
 	Extra map[string]any
 
+	OIDCPreferredUsernameIsDisplayName bool
+
 	*UserDetails
+}
+
+// UseDisplayNameAsOIDCPreferredUsername indicates that OIDC should use the display name for preferred_username.
+func (d *UserDetailsExtended) UseDisplayNameAsOIDCPreferredUsername() bool {
+	return d != nil && d.OIDCPreferredUsernameIsDisplayName
 }
 
 // Addresses returns the Emails []string as []mail.Address formatted with DisplayName as the Name attribute.

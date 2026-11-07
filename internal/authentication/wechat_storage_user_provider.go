@@ -60,7 +60,7 @@ func (p *WeChatStorageUserProvider) GetDetailsExtended(username string) (*UserDe
 	if err != nil {
 		return nil, err
 	}
-	return &UserDetailsExtended{UserDetails: details}, nil
+	return &UserDetailsExtended{UserDetails: details, OIDCPreferredUsernameIsDisplayName: true}, nil
 }
 
 func (p *WeChatStorageUserProvider) CheckUserPassword(_, _ string) (bool, error) { return false, nil }

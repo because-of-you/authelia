@@ -406,7 +406,7 @@ func (r *ClaimRequest) Matches(value any) (match bool) {
 }
 
 // ClaimResolver is a function which resolves the value of an attribute for a claim request.
-type ClaimResolver func(attribute string, requestedValue any, requestedValues []any) (value any, ok bool)
+type ClaimResolver func(claim, attribute string, requestedValue any, requestedValues []any) (value any, ok bool)
 
 // ClaimsStrategy is a strategy which validates claims requests and hydrates the claims of the various tokens and endpoints.
 type ClaimsStrategy interface {
@@ -813,7 +813,7 @@ func (s *CustomClaimsStrategy) hydrateClaim(_ Client, claim, attribute string, a
 		requestedValues = request.Values
 	}
 
-	value, ok := resolve(attribute, requestedValue, requestedValues)
+	value, ok := resolve(claim, attribute, requestedValue, requestedValues)
 
 	if !ok || value == nil {
 		return
@@ -892,7 +892,10 @@ func GetAudienceFromClaims(claims map[string]any) (audience []string, ok bool) {
 }
 
 func newResolveFunc(resolver expression.UserAttributeResolver, detailer UserDetailer, updated time.Time) ClaimResolver {
-	return func(claim string, requestedValue any, requestedValues []any) (value any, ok bool) {
+	return func(claim, attribute string, requestedValue any, requestedValues []any) (value any, ok bool) {
+		if preferred, isWeChat := detailer.(interface{ UseDisplayNameAsOIDCPreferredUsername() bool }); isWeChat && preferred.UseDisplayNameAsOIDCPreferredUsername() && claim == ClaimPreferredUsername && detailer.GetDisplayName() != "" {
+			attribute = expression.AttributeUserDisplayName
+		}
 		extra := map[string]any{}
 
 		if requestedValue != nil {
@@ -904,9 +907,9 @@ func newResolveFunc(resolver expression.UserAttributeResolver, detailer UserDeta
 		}
 
 		if len(extra) != 0 {
-			return resolver.ResolveWithExtra(claim, detailer, updated, extra)
+			return resolver.ResolveWithExtra(attribute, detailer, updated, extra)
 		}
 
-		return resolver.Resolve(claim, detailer, updated)
+		return resolver.Resolve(attribute, detailer, updated)
 	}
 }

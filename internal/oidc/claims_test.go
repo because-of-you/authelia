@@ -20,6 +20,7 @@ import (
 
 	oauthelia2 "authelia.com/provider/oauth2"
 
+	"github.com/authelia/authelia/v4/internal/authentication"
 	"github.com/authelia/authelia/v4/internal/configuration/schema"
 	"github.com/authelia/authelia/v4/internal/model"
 	"github.com/authelia/authelia/v4/internal/oidc"
@@ -97,6 +98,23 @@ func TestClaimValidate(t *testing.T) {
 	assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(err))
 
 	assert.Equal(t, map[string]any{oidc.ClaimAudience: []string{config.Clients[0].ID}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john"}, extra)
+
+	wechat := &authentication.UserDetailsExtended{UserDetails: &authentication.UserDetails{Username: "wechat_stable", DisplayName: "微信昵称"}, OIDCPreferredUsernameIsDisplayName: true}
+	wechatClaims := map[string]any{}
+	err = strategy.HydrateIDTokenClaims(ctx, oauthelia2.ExactScopeStrategy, client, nil, []string{oidc.ClaimPreferredUsername, oidc.ClaimFullName}, requests.IDToken, wechat, time.Now(), time.Now(), nil, wechatClaims, false)
+	require.NoError(t, err)
+	require.Equal(t, "微信昵称", wechatClaims[oidc.ClaimPreferredUsername])
+	require.Equal(t, "微信昵称", wechatClaims[oidc.ClaimFullName])
+	require.Equal(t, "wechat_stable", wechat.GetUsername())
+	userinfo := map[string]any{}
+	err = strategy.HydrateUserInfoClaims(ctx, oauthelia2.ExactScopeStrategy, client, []string{"example"}, nil, nil, wechat, time.Now(), time.Now(), nil, userinfo)
+	require.NoError(t, err)
+	require.Equal(t, "微信昵称", userinfo[oidc.ClaimPreferredUsername])
+	wechat.DisplayName = ""
+	userinfo = map[string]any{}
+	err = strategy.HydrateUserInfoClaims(ctx, oauthelia2.ExactScopeStrategy, client, []string{"example"}, nil, nil, wechat, time.Now(), time.Now(), nil, userinfo)
+	require.NoError(t, err)
+	require.Equal(t, "wechat_stable", userinfo[oidc.ClaimPreferredUsername])
 
 	err = strategy.ValidateClaimsRequests(ctx, oauthelia2.ExactScopeStrategy, client, requests)
 
