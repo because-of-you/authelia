@@ -193,4 +193,13 @@ func TestWeChatProfileEmailIsUniqueAndScoped(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{email}, details.Emails)
 	require.True(t, details.EmailUnverified)
+	require.Equal(t, "Alice updated", details.DisplayName)
+	byUsername, err := p.LookupWeChatUser(ctx, "", "", a.Username)
+	require.NoError(t, err)
+	require.Equal(t, a.Username, byUsername.Username)
+	require.Equal(t, "Alice updated", byUsername.DisplayName)
+	require.NoError(t, s.SaveProfile(ctx, a, wechat.Profile{Avatar: []byte("a")}))
+	byUsername, err = p.LookupWeChatUser(ctx, "", "", a.Username)
+	require.NoError(t, err)
+	require.Equal(t, "微信用户", byUsername.DisplayName)
 }

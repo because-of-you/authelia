@@ -28,7 +28,7 @@ function ConsentPortal(props: Props) {
             />
             <Route
                 path={ConsentOpenIDDeviceAuthorizationSubRoute}
-                element={<OpenIDConnectConsentDeviceAuthorizationFormView state={props.state} />}
+                element={<OpenIDConnectConsentDeviceAuthorizationFormView state={props.state} userInfo={props.userInfo} />}
             />
         </Routes>
     );

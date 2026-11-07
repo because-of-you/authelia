@@ -318,6 +318,7 @@ function DecisionFormView({ state, userInfo }: Props) {
     return (
         <LoginLayout
             id={"openid-consent-decision-stage"}
+            userInfo={userInfo}
             title={`${translate("Hi", { ns: "portal" })} ${userInfo.display_name}`}
             subtitle={translate("Consent Request")}
             maxWidth={"sm"}

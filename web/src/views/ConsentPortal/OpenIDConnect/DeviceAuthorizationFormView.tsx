@@ -27,6 +27,7 @@ import {
 import { useUserCode } from "@hooks/OpenIDConnect";
 import { useRouterNavigate } from "@hooks/RouterNavigate";
 import LoginLayout from "@layouts/LoginLayout";
+import { UserInfo } from "@models/UserInfo";
 import { AutheliaState, AuthenticationLevel } from "@services/State";
 import LoadingPage from "@views/LoadingPage/LoadingPage";
 
@@ -34,9 +35,10 @@ const normalizeUserCode = (value: string) => value.toUpperCase().replace(/\s+/g,
 
 export interface Props {
     state: AutheliaState;
+    userInfo?: UserInfo;
 }
 
-function DeviceAuthorizationFormView({ state }: Props) {
+function DeviceAuthorizationFormView({ state, userInfo }: Props) {
     const { t: translate } = useTranslation(["consent", "settings"]);
 
     const userCode = useUserCode();
@@ -109,7 +111,7 @@ function DeviceAuthorizationFormView({ state }: Props) {
     }
 
     return (
-        <LoginLayout id={"openid-consent-device-auth-stage"} title={translate("Confirm the Code")}>
+        <LoginLayout id={"openid-consent-device-auth-stage"} title={translate("Confirm the Code")} userInfo={userInfo}>
             <div className="flex w-full flex-col gap-4">
                 <div className="flex w-full items-center justify-center">
                     <LogoutButton />

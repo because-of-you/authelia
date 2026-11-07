@@ -162,12 +162,12 @@ func (s *wechatSQLStore) LookupMiniUser(ctx context.Context, appID, openID strin
 
 // LookupWeChatUser resolves only an explicitly enabled account in the configured store.
 func (p *SQLProvider) LookupWeChatUser(ctx context.Context, appID, openID, username string) (*authentication.UserDetails, error) {
-	query := `SELECT u.username, u.display_name, u.email, g.name FROM wechat_users u `
+	query := `SELECT u.username, COALESCE(NULLIF(p.nickname, ''), u.display_name), u.email, g.name FROM wechat_users u `
 	args := []any{}
 	if username == "" {
 		query += `JOIN wechat_identities i ON i.user_id = u.id `
 	}
-	query += `LEFT JOIN wechat_user_groups ug ON ug.user_id = u.id LEFT JOIN wechat_groups g ON g.id = ug.group_id WHERE `
+	query += `LEFT JOIN wechat_profiles p ON p.user_id = u.id LEFT JOIN wechat_user_groups ug ON ug.user_id = u.id LEFT JOIN wechat_groups g ON g.id = ug.group_id WHERE `
 	if username == "" {
 		query += `i.appid = ? AND i.openid = ? AND u.enabled = ? ORDER BY g.name`
 		args = append(args, appID, openID, true)

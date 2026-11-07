@@ -24,6 +24,7 @@ import {
     ErrorURI,
 } from "@constants/SearchParams";
 import LoginLayout from "@layouts/LoginLayout";
+import { UserInfo } from "@models/UserInfo";
 
 type Outcome = "accepted" | "error" | "rejected";
 
@@ -45,7 +46,7 @@ const outcomes: Record<Outcome, { className: string; icon: ReactNode; title: str
     },
 };
 
-function CompletionView() {
+function CompletionView({ userInfo }: { userInfo?: UserInfo }) {
     const { t: translate } = useTranslation(["consent"]);
 
     const [query] = useSearchParams();
@@ -57,7 +58,7 @@ function CompletionView() {
     const { className, icon, title } = outcomes[outcome];
 
     return (
-        <LoginLayout id={"openid-completion-stage"} title={translate(title)} maxWidth={"sm"}>
+        <LoginLayout id={"openid-completion-stage"} title={translate(title)} maxWidth={"sm"} userInfo={userInfo}>
             <Empty
                 data-testid={"openid-completion-outcome"}
                 data-outcome={outcome}

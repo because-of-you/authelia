@@ -97,7 +97,7 @@ vi.mock("@views/LoadingPage/LoadingPage", () => ({
     default: () => <div data-testid="loading-page" />,
 }));
 
-const userInfo = { display_name: "Test User", emails: ["test@example.com"], groups: [] } as any;
+const userInfo = { display_name: "Test User", emails: ["test@example.com"], groups: [], wechat_avatar: true } as any;
 
 const response = (overrides: Partial<any> = {}) => ({
     audience: [],
@@ -294,6 +294,12 @@ it("uses a wider layout so the request details remain readable", async () => {
     await renderLoaded();
 
     expect(mocks.layoutProps.current.maxWidth).toBe("sm");
+});
+
+it("passes the authenticated user to the layout for the saved avatar", async () => {
+    await renderLoaded();
+
+    expect(mocks.layoutProps.current.userInfo).toEqual(userInfo);
 });
 
 it("accepts the consent request and redirects", async () => {

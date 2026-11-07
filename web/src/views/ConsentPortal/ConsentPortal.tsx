@@ -69,7 +69,7 @@ function ConsentPortalRouter(props: RouterProps) {
                 path={`${ConsentOpenIDSubRoute}/*`}
                 element={<OpenIDConnect userInfo={props.userInfo} state={props.state} />}
             />
-            <Route path={ConsentCompletionSubRoute} element={<CompletionView />} />
+            <Route path={ConsentCompletionSubRoute} element={<CompletionView userInfo={props.userInfo} />} />
         </Routes>
     );
 }
