@@ -35,6 +35,11 @@ func TestWeChatACLRequiresEnabledAdminAndPreservesRuleOrder(t *testing.T) {
 				{Domains: []string{"first.example.com"}, Policy: "one_factor", Subjects: [][]string{{"group:engineering", "user:alice"}, {"group:admin"}}, Resources: []regexp.Regexp{*regexp.MustCompile(`^/api/reports([/?].*)?$`)}, Methods: []string{"GET"}, Query: [][]schema.AccessControlRuleQuery{{{Key: "format", Operator: "equal", Value: "json"}, {Key: "preview", Operator: "absent"}}, {{Key: "download", Operator: "present"}}}},
 				{Domains: []string{"second.example.com"}, Policy: "deny", Resources: []regexp.Regexp{*regexp.MustCompile(`^/api/internal([/?].*)?$`)}},
 			}}
+			mock.Ctx.Configuration.IdentityProviders.OIDC = &schema.IdentityProvidersOpenIDConnect{
+				HMACSecret:            "never-expose-issuer-secret",
+				Clients:               []schema.IdentityProvidersOpenIDConnectClient{{ID: "example", Name: "Example", AuthorizationPolicy: "restricted", RedirectURIs: []string{"https://example.com/callback"}, Scopes: []string{"openid", "profile"}, RequirePKCE: true}},
+				AuthorizationPolicies: map[string]schema.IdentityProvidersOpenIDConnectPolicy{"restricted": {DefaultPolicy: "deny", Rules: []schema.IdentityProvidersOpenIDConnectPolicyRule{{Policy: "one_factor", Subjects: [][]string{{"group:admin"}}}}}},
+			}
 			h := &WeChatHandlers{client: wechat.NewClient("wx0123456789abcdef", "secret", "develop"), store: &groupHandlerStore{enabled: tc.enabled, groups: tc.groups}}
 			mock.Ctx.Request.Header.Set("Authorization", "Bearer "+strings.Repeat("a", 64))
 			h.ACL(mock.Ctx)
@@ -44,8 +49,9 @@ func TestWeChatACLRequiresEnabledAdminAndPreservesRuleOrder(t *testing.T) {
 			}
 			var response struct {
 				Data struct {
-					DefaultPolicy string          `json:"default_policy"`
-					Rules         []wechatACLRule `json:"rules"`
+					DefaultPolicy string             `json:"default_policy"`
+					Rules         []wechatACLRule    `json:"rules"`
+					Clients       []wechatOIDCClient `json:"oidc_clients"`
 				} `json:"data"`
 			}
 			require.NoError(t, json.Unmarshal(mock.Ctx.Response.Body(), &response))
@@ -59,6 +65,14 @@ func TestWeChatACLRequiresEnabledAdminAndPreservesRuleOrder(t *testing.T) {
 			require.Equal(t, []string{"second.example.com"}, response.Data.Rules[1].Domains)
 			require.Equal(t, "deny", response.Data.Rules[1].Policy)
 			require.Equal(t, []string{`^/api/internal([/?].*)?$`}, response.Data.Rules[1].Resources)
+			require.Len(t, response.Data.Clients, 1)
+			require.Equal(t, "example", response.Data.Clients[0].ID)
+			require.Equal(t, []string{"https://example.com/callback"}, response.Data.Clients[0].RedirectURIs)
+			require.Equal(t, "deny", response.Data.Clients[0].PolicyDefault)
+			require.Equal(t, [][]string{{"group:admin"}}, response.Data.Clients[0].PolicyRules[0].Subjects)
+			require.True(t, response.Data.Clients[0].RequirePKCE)
+			require.NotContains(t, string(mock.Ctx.Response.Body()), "never-expose-issuer-secret")
+			require.NotContains(t, string(mock.Ctx.Response.Body()), "client_secret")
 		})
 	}
 }

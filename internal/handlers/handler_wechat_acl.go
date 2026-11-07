@@ -21,6 +21,25 @@ type wechatACLRule struct {
 	Query          [][]schema.AccessControlRuleQuery `json:"query"`
 }
 
+type wechatOIDCPolicyRule struct {
+	Policy   string     `json:"policy"`
+	Subjects [][]string `json:"subjects"`
+	Networks []string   `json:"networks"`
+}
+
+type wechatOIDCClient struct {
+	ID                  string                 `json:"id"`
+	Name                string                 `json:"name"`
+	AuthorizationPolicy string                 `json:"authorization_policy"`
+	PolicyDefault       string                 `json:"policy_default,omitempty"`
+	PolicyRules         []wechatOIDCPolicyRule `json:"policy_rules"`
+	RedirectURIs        []string               `json:"redirect_uris"`
+	Scopes              []string               `json:"scopes"`
+	GrantTypes          []string               `json:"grant_types"`
+	Public              bool                   `json:"public"`
+	RequirePKCE         bool                   `json:"require_pkce"`
+}
+
 // ACL returns the active configuration in matching order to an enabled admin.
 func (h *WeChatHandlers) ACL(ctx *middlewares.AutheliaCtx) {
 	if _, ok := h.groupAdministrator(ctx); !ok {
@@ -48,7 +67,29 @@ func (h *WeChatHandlers) ACL(ctx *middlewares.AutheliaCtx) {
 		}
 		rules = append(rules, item)
 	}
-	if err := ctx.SetJSONBody(map[string]any{"default_policy": access.DefaultPolicy, "rules": rules}); err != nil {
+	clients := make([]wechatOIDCClient, 0)
+	if oidc := ctx.Configuration.IdentityProviders.OIDC; oidc != nil {
+		for _, client := range oidc.Clients {
+			item := wechatOIDCClient{ID: client.ID, Name: client.Name, AuthorizationPolicy: client.AuthorizationPolicy,
+				RedirectURIs: append([]string{}, client.RedirectURIs...), Scopes: append([]string{}, client.Scopes...),
+				GrantTypes: append([]string{}, client.GrantTypes...), Public: client.Public, RequirePKCE: client.RequirePKCE,
+				PolicyRules: []wechatOIDCPolicyRule{}}
+			if policy, ok := oidc.AuthorizationPolicies[client.AuthorizationPolicy]; ok {
+				item.PolicyDefault = policy.DefaultPolicy
+				for _, rule := range policy.Rules {
+					entry := wechatOIDCPolicyRule{Policy: rule.Policy, Subjects: rule.Subjects, Networks: []string{}}
+					for _, network := range rule.Networks {
+						if network != nil {
+							entry.Networks = append(entry.Networks, network.String())
+						}
+					}
+					item.PolicyRules = append(item.PolicyRules, entry)
+				}
+			}
+			clients = append(clients, item)
+		}
+	}
+	if err := ctx.SetJSONBody(map[string]any{"default_policy": access.DefaultPolicy, "rules": rules, "oidc_clients": clients}); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to write ACL response")
 	}
 }
